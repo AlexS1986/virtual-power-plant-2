@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: twin #iot-system
+  name: twin # iot-system
+  namespace: iot-system-1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: twin #iot-system
+  template:
+    metadata:
+      labels:
+        app: twin #iot-system
+        actorSystemName: twin #iot-system
+    spec:
+      containers:
+      - name: twin #iot-system
+        image: alexs1986/twin:latest #alexs1986/akka-quickstart-scala-iot:latest
+        # remove for real clusters, useful for minikube
+        imagePullPolicy: Always
+        readinessProbe: # configure health checks 
+          httpGet:
+            path: /ready
+            port: management
+          periodSeconds: 10
+          failureThreshold: 3
+          initialDelaySeconds: 10
+        livenessProbe:
+          httpGet:
+            path: "/alive"
+            port: management
+          periodSeconds: 10
+          failureThreshold: 5
+          initialDelaySeconds: 20
+        ports:
+        # akka-management and bootstrap
+        - name: management
+          containerPort: 8558
+          protocol: TCP
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          #limits:
+          #  cpu: 500m
+          # You must specify requests for CPU to autoscale
+          # based on CPU utilization
+          requests:
+            cpu: 200m
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: REQUIRED_CONTACT_POINT_NR
+          value: "2"
+        - name: postgresql_url
+          valueFrom: { secretKeyRef: { name: postgresql-env, key: postgresql_url } }
+        - name: postgresql_username
+          valueFrom: { secretKeyRef: { name: postgresql-env, key: postgresql_username } }
+        - name: postgresql_password
+          valueFrom: { secretKeyRef: { name: postgresql-env, key: postgresql_password } }
+        - name: postgresql_url_readside
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_url_readside } }
+        - name: postgresql_username_readside
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_username_readside } }
+        - name: postgresql_password_readside
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_password_readside } }
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader
+  namespace: iot-system-1
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: read-pods
+  namespace: iot-system-1
+subjects:
+# Note the `name` line below. The first default refers to the namespace. The second refers to the service account name.
+# For instance, `name: system:serviceaccount:myns:default` would refer to the default service account in namespace `myns`
+- kind: User
+  name: system:serviceaccount:iot-system-1:default
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-system-internal-service
+  namespace: iot-system-1
+spec:
+  selector:
+    app: twin #iot-system  
+  ports:
+    - protocol: TCP
+      port: 30080
+      targetPort: 8080
+--- # external service for simulator
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: twin #iot-system
+  name: iot-system-service
+  namespace: iot-system-1
+spec:
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: port-1
+    nodePort: 30145
+    port: 8558
+    protocol: TCP
+    targetPort: 8558
+  - name: port-2
+    nodePort: 31364
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: twin #iot-system
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: twin-horizontal-scaler
+  namespace: iot-system-1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: twin
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70

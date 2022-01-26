@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: readside
+  name: readside
+  namespace: iot-system-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: readside
+  template:
+    metadata:
+      labels:
+        app: readside
+        actorSystemName: readside
+    spec:
+      containers:
+      - name: readside
+        image: alexs1986/readside:latest
+        # remove for real clusters, useful for minikube
+        imagePullPolicy: Always
+        ports:
+        # akka-management and bootstrap
+        - name: management
+          containerPort: 8558
+          protocol: TCP
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: postgresql_url_readside 
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_url_readside } }
+        - name: postgresql_username_readside
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_username_readside } }
+        - name: postgresql_password_readside
+          valueFrom: { secretKeyRef: { name: postgresql-readside-env, key: postgresql_password_readside } }
+--- # internal service for readside 
+apiVersion: v1
+kind: Service
+metadata:
+  name: readside-internal-service
+  namespace: iot-system-1
+spec:
+  selector:
+    app: readside  
+  ports:
+    - protocol: TCP
+      port: 30080
+      targetPort: 8080

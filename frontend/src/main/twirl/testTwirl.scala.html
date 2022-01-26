@@ -1,0 +1,21 @@
+@(groupId: String, deviceId: String, deviceData: Double)
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      @{deviceId + groupId}
+    </title>
+  </head>
+  <body>
+    <h1> Device details of @deviceId in group @groupId</h1>
+  
+    <ul>
+      <li>detail1</li>
+      <li>detail2</li>
+      <li>@deviceData</li>
+    </ul>
+    <a href="/">overview</a>
+  </body>
+</html>
+

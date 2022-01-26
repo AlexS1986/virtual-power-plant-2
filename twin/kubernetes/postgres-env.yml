@@ -1,0 +1,13 @@
+apiVersion: v1
+data:
+  postgresql_password: T0dpVU9iN205dQ==
+  postgresql_url: amRiYzpwb3N0Z3Jlc3FsOi8vcG9zdGdyZXNxbC5wb3N0Z3Jlc3FsLnN2Yy5jbHVzdGVyLmxvY2FsOjU0MzIv
+  postgresql_username: cG9zdGdyZXM=
+kind: Secret
+metadata:
+  creationTimestamp: "2021-09-16T08:17:38Z"
+  name: postgresql-env
+  namespace: iot-system-1
+  resourceVersion: "70931"
+  uid: 8c5da439-fc10-48e1-a635-10ee8a4d9fcb
+type: Opaque
