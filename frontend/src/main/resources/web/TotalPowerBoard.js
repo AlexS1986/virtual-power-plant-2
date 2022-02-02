@@ -97,7 +97,10 @@ class TotalPowerBoard {
 
         var headers = {"Content-Type" : "application/json"}
         var data = JSON.stringify({"vppId": vppId,"before": before,"after": after })
-        Util.sendRequestToServer("/energy","POST",data,headers,energyDepositResponseHandler,this) // has to be POST if you want to send data in body
+        let beforeTest = before.replace(" ","T")
+        let afterTest = after.replace(" ","T")
+        Util.sendRequestToServer("/vpp/"+vppId+"/energies?before="+beforeTest+"&after="+afterTest,"GET",null,{"Content-Type" : "application/json"},energyDepositResponseHandler,this)
+        //Util.sendRequestToServer("/energy","POST",data,headers,energyDepositResponseHandler,this) // has to be POST if you want to send data in body
     }
 
 }

@@ -20,9 +20,9 @@ class DeviceSimulator {
         this.sendStopNotificationToServer()
         this.simulationState = "passive"
         //this.sendDeleteNotificationToServer()
-        setTimeout(function(deviceSimulatorToStop) { // give all post Requests time to be processed then remove 
+        /*setTimeout(function(deviceSimulatorToStop) { // give all post Requests time to be processed then remove 
             deviceSimulatorToStop.sendDeleteNotificationToServer()
-        },10000,this)
+        },10000,this)*/
     }
 
     setTemperature (temperature) {
@@ -53,23 +53,24 @@ class DeviceSimulator {
         return "Device|"+groupId+"&&&"+deviceId
     }
 
-    sendDeleteNotificationToServer() {
+    /*sendDeleteNotificationToServer() {
         var headers = {"Content-Type" : "application/json"}
         var data = JSON.stringify({"deviceId": this.deviceId,"groupId": this.groupId })
         Util.sendRequestToServer("/delete","DELETE",data,headers)
-    }
+    }*/
     
 
     sendStartNotificationToServer() {
         var headers = {"Content-Type" : "application/json"}
         var data = JSON.stringify({"deviceId": this.deviceId,"groupId": this.groupId })
-        Util.sendRequestToServer("/start","POST",data,headers)
+        Util.sendRequestToServer("simulator/"+this.groupId+"/"+this.deviceId + "/start","POST",data,headers)
     }
 
     sendStopNotificationToServer() {
         var headers = {"Content-Type" : "application/json"}
         var data = JSON.stringify({"deviceId": this.deviceId,"groupId": this.groupId })
-        Util.sendRequestToServer("/stop","POST",data,headers)
+        Util.sendRequestToServer("vpp/device/"+this.groupId+"/"+this.deviceId,"DELETE",data,headers)
+        //Util.sendRequestToServer("/stop","POST",data,headers)
     }
 
 

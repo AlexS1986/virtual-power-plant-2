@@ -219,7 +219,7 @@ class VPPOverview {
                 const tdDetails = tr.insertCell();
                 const detailsLink = document.createElement("a");
                 detailsLink.innerHTML = "details"
-                detailsLink.setAttribute("href","device/"+deviceSimulatorToRender.groupId+"/"+deviceSimulatorToRender.deviceId)
+                detailsLink.setAttribute("href","vpp/device/"+deviceSimulatorToRender.groupId+"/"+deviceSimulatorToRender.deviceId)
                 tdDetails.appendChild(detailsLink)
 
                 const tdStop = tr.insertCell();

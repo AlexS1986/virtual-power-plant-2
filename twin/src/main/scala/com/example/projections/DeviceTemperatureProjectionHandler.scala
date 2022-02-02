@@ -31,8 +31,8 @@ class DeviceTemperatureProjectionHandler(
          repo.update(session,persistenceId,temperature)
          logTemperature(session,persistenceId) */
       case Device.EventDataRecorded(persistenceId,capacity,chargeStatus,deliveredEnergy,deliveredEnergyDate) =>
-         println("PROJECTIONHANDLER EVENT DATA HIT")
-         repo.update(session,persistenceId,chargeStatus) // TODO can be removed
+         //println("PROJECTIONHANDLER EVENT DATA HIT")
+         //repo.update(session,persistenceId,chargeStatus) // TODO can be removed
 
          val (groupId,deviceId) = Device.getGroupIdDeviceIdFromPersistenceIdString(persistenceId)
          if(deliveredEnergy != 0.0) repo.recordEnergyDeposit(session,groupId,deviceId,deliveredEnergy,deliveredEnergyDate)

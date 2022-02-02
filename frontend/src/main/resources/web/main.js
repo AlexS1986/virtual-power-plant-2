@@ -70,7 +70,7 @@ $(document).ready(function () {
                         if(Object.keys(o).length === 0 && o.constructor === Object) { // test if response is an empty object       
                         } else {
                             var deviceDataFromServer = o
-                            vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer,"default")
+                            vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer,this.myParameters)
                             // handle results from readside
                             /*var deviceDataFromServer = o.devicesAndTemperatures
                             vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer)
@@ -86,7 +86,7 @@ $(document).ready(function () {
         }
         var headers = {"Content-Type" : "application/json"}
         //Util.sendRequestToServer("/devicesAndTemperatures","GET",null,headers,dataFromServerHandler) // from DB
-        Util.sendRequestToServer("/group/default","GET",null,headers,dataFromServerHandler,"default")
+        Util.sendRequestToServer("/vpp/default","GET",null,headers,dataFromServerHandler,"default")
 
         
         let vppId = "default";
@@ -101,7 +101,9 @@ $(document).ready(function () {
 
         // clean up database, TODO do this serverside?
         if(deleteCounter % 5 == 0 ) {
-            Util.sendRequestToServer("/deleteEnergyDeposits","POST",JSON.stringify({"before": after}),{"Content-Type" : "application/json"});
+            //Util.sendRequestToServer("/vpp/"+defaultGroupName+"/energies/delete?before="+beforeTest+"&after="+afterTest,"GET",null,{"Content-Type" : "application/json"})
+            Util.sendRequestToServer("/vpp/"+defaultGroupName+"/energies/delete","POST",JSON.stringify({"before": after}),{"Content-Type" : "application/json"})
+            //Util.sendRequestToServer("/deleteEnergyDeposits","POST",JSON.stringify({"before": after}),{"Content-Type" : "application/json"});
         }
         deleteCounter = deleteCounter +1;
 

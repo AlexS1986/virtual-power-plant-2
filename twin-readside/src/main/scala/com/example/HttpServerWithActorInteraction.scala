@@ -120,6 +120,7 @@ object HttpServerWithActorInteraction {
       path("deleteEnergyDeposits" ) { // deletes in backend readside- database
         post {
           entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest =>
+            println("ENERGYDEPOSITDELETE!!!")
             //val fullDeviceName = "Device|"+startSimulation.groupId+"&&&"+startSimulation.deviceId
             val session = new ScalikeJdbcSession()
             deviceTemperatureRepository.deleteEnergyDeposits(session,deleteEnergyDepositsRequest.before)
@@ -129,6 +130,7 @@ object HttpServerWithActorInteraction {
         }
       },
       path("energyDeposits") {
+        println("GET energies")
         get {
           entity(as[EnergyDepositedRequest]) { energyDepositRequest => 
             val session = new ScalikeJdbcSession() // TODO HERE OR ONCE?

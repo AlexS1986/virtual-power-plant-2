@@ -11,4 +11,6 @@ sleep 10s
 sleep 1s
 
 export http_port=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}') #https://www.cyberciti.biz/faq/grep-regular-expressions/
-echo $(curl -v -XGET http://192.168.49.2:$http_port/energy -H "Content-Type: application/json" --data '{"vppId":"default","before": "2010-10-19 10:23:54","after": "2001-10-19 10:23:54"}')
+export parameters='?before=2010-10-19T10:23:54&after=2001-10-19T10:23:54'
+echo $(curl -v -XGET http://192.168.49.2:$http_port/vpp/default/energies$parameters)
+# echo $(curl -v -XGET http://192.168.49.2:$http_port/default/energies -H "Content-Type: application/json" --data '{"vppId":"default","before": "2010-10-19 10:23:54","after": "2001-10-19 10:23:54"}')
