@@ -1,6 +1,5 @@
-package com.example
+package frontend
 
-import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -11,8 +10,6 @@ import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.io.StdIn
-import akka.http.javadsl.model.StatusCode
 import scala.util.Success
 import scala.util.Failure
 
@@ -25,7 +22,7 @@ import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.HttpCharsets
 import akka.http.scaladsl.model.MediaType
-import scala.collection.View
+//import scala.collection.View
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.marshalling.Marshal
@@ -42,8 +39,9 @@ import scala.util.Try
 
 
 object HttpServerWithActorInteraction {
-  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
 
+  // represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
+  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
   //https://stackoverflow.com/questions/43881969/de-serializing-localdatetime-with-akka-http?rq=1
   implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss") //DateTimeFormatter.ISO_DATE_TIME
@@ -53,40 +51,23 @@ object HttpServerWithActorInteraction {
       case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
     }
   }
-  implicit val energyDepositFormat = jsonFormat3(EnergyDepositedRequest)
+  implicit val energyDepositedF = jsonFormat3(EnergyDepositedRequest)
 
+  // represents the body of a http-request to delete energy deposit data
   final case class DeleteEnergyDepositsRequest(before:LocalDateTime)
   implicit val deleteEnergyDepositsRequestFormat = jsonFormat1(DeleteEnergyDepositsRequest)
 
-  final case class DeviceAndTemperature(deviceId: String, temperature: Double)
-  final case class DevicesAndTemperatures(devicesAndTemperatures: List[DeviceAndTemperature])
-
-  final case class RecordTemperature(groupId: String,deviceId: String,value: Double)
-
-  final case class StartSimulation(deviceId: String, groupId: String) 
-  final case class StopSimulation(deviceId: String, groupId: String) 
-
+  // identifies a device in body of http requests
   final case class DeviceIdentifier(deviceId: String, groupId: String)
-
-  final case class VppIdentifier(groupId: String)
-
-  final case class DeviceData(data:Double, currentHost:String) 
-  implicit val deviceDataFormat = jsonFormat2(DeviceData)
-
-  implicit val startSimulation = jsonFormat2(StartSimulation)
-  implicit val stopSimulation = jsonFormat2(StopSimulation)
   implicit val deviceIdentifierF = jsonFormat2(DeviceIdentifier)
+
+  // identifies a VPP in body of http requests
+  final case class VppIdentifier(groupId: String)
   implicit val vppIdentifierF = jsonFormat1(VppIdentifier)
 
-
-  implicit val deviceAndTemperatureFormat = jsonFormat2(DeviceAndTemperature)
-  implicit val devicesAndTemperaturesFormat = jsonFormat1(DevicesAndTemperatures)
-
-  implicit val recordTemperature = jsonFormat3(RecordTemperature)
-
-  
-  
-
+  // represents current information
+  final case class DeviceData(data:Double, currentHost:String) 
+  implicit val deviceDataF = jsonFormat2(DeviceData)
 
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[_] =
@@ -130,10 +111,6 @@ object HttpServerWithActorInteraction {
               getFromResource("web/TotalPowerBoard.js", ContentTypes.`application/json`)
             case "DeviceSimulator.js" =>
               getFromResource("web/DeviceSimulator.js", ContentTypes.`application/json`)
-            /*case "OSC.js" =>
-              getFromResource("web/OSC.js", ContentTypes.`application/json`) */
-            /*case "hello.js" =>
-              getFromResource("web/hello.js", ContentTypes.`application/json`) */
             case "main.js" =>
               getFromResource("web/main.js", ContentTypes.`application/json`)
             case "main.css" =>
@@ -189,7 +166,7 @@ object HttpServerWithActorInteraction {
       path ("vpp" / "device" / Segment / Segment ) { (vppId,deviceId) => // get particular device data in twin service
         concat(get {
           onComplete{
-            val deviceIdentifier = StartSimulation(deviceId,vppId)
+            val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/temperature",HttpMethods.GET)
           }{                           
             case Success(result)    => 
@@ -268,7 +245,7 @@ object HttpServerWithActorInteraction {
               uri = uri, 
               entity = HttpEntity(
                 contentType = ContentTypes.`application/json`,
-                content.toString//"{\"groupId\":\""+groupId+"\",\"deviceId\":\""+deviceId+"\"}"
+                content.toString
               )
             )
             // TODO do this with dedicated dispatcher?

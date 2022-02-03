@@ -1,4 +1,4 @@
-package com.example
+package frontend
 
 import scala.concurrent.Future
 
