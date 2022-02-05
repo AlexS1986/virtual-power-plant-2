@@ -1,4 +1,5 @@
-@(groupId: String, deviceId: String, deviceData: Double)
+@import frontend.HttpServerFrontend.DeviceData
+@(groupId: String, deviceId: String, deviceData: DeviceData)
 
 <!DOCTYPE html>
 <html>
@@ -13,7 +14,7 @@
     <ul>
       <li>detail1</li>
       <li>detail2</li>
-      <li>@deviceData</li>
+      <li>@deviceData.data</li>
     </ul>
     <a href="/">overview</a>
   </body>

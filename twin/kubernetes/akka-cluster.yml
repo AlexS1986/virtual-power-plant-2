@@ -18,9 +18,9 @@ spec:
     spec:
       containers:
       - name: twin #iot-system
-        image: alexs1986/twin:latest #alexs1986/akka-quickstart-scala-iot:latest
+        image: alexs1986/twin:latest 
         # remove for real clusters, useful for minikube
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         readinessProbe: # configure health checks 
           httpGet:
             path: /ready

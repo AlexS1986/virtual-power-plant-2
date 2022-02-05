@@ -82,7 +82,7 @@ classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.AllLibraryJars
 fork in run := true
 Compile / run / fork := true
 
-Compile / mainClass := Some("com.example.IotApp") // tell compiler the main class
+Compile / mainClass := Some("twin.IotApp") // tell compiler the main class
 
 enablePlugins(JavaServerAppPackaging, DockerPlugin) // enable docker plugin for deployment in k8s 
 // https://doc.akka.io/docs/akka-management/current/kubernetes-deployment/building-using-sbt.html

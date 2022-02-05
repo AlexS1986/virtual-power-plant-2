@@ -53,7 +53,7 @@ classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.AllLibraryJars
 fork in run := true
 Compile / run / fork := true
 
-Compile / mainClass := Some("frontend.HttpServerWithActorInteraction") // tell compiler the main class
+Compile / mainClass := Some("frontend.HttpServerFrontend") // tell compiler the main class
 
 enablePlugins(JavaServerAppPackaging, DockerPlugin) // enable docker plugin for deployment in k8s
 
