@@ -12,7 +12,7 @@ sleep 1s
 export http_port=$(kubectl get service | grep "iot-system-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}') #https://www.cyberciti.biz/faq/grep-regular-expressions/
 echo $http_port
 #test
-echo $(curl -XGET http://192.168.49.2:$http_port/hostname -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
+#echo $(curl -XGET http://192.168.49.2:$http_port/hostname -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 
 
 #record and retrieve temperature

@@ -162,21 +162,21 @@ private[twin] final class DeviceRoutes(
               implicit val actorSystem      = system
 
               val result = networkActor
-                .ask((replyTo: ActorRef[Device.RespondTemperature]) =>
+                .ask((replyTo: ActorRef[Device.RespondData]) =>
                   NetworkActor
                     .RequestTemperature(hostnameRequest.groupId, hostnameRequest.deviceId, replyTo)
                 )
                 .map { res =>
                   res match {
-                    case Device.RespondTemperature(
+                    case Device.RespondData(
                           _,
                           _,
-                          Some(temperature),
+                          Device.DeviceState(_,Some(temperature),_),
                           Some(currentHost)
                         ) => 
                           val stateJson = DeviceData(temperature,currentHost).toJson
                           stateJson.toString
-                    case Device.RespondTemperature(_, _, None,_) => "{}"
+                    case Device.RespondData(_, _, Device.DeviceState(_,None,_),_) => "{}"
                     case _ => "{}" //Map("error" -> "could not read data").toJson
                     //s"No temperature recorded"
                   }
@@ -257,7 +257,7 @@ private[twin] final class DeviceRoutes(
           }
         }
       },
-      get {
+      /*get {
         path("hostname") {
           entity((as[RequestTemperature])) { temperatureRequest =>
             import akka.util.Timeout
@@ -268,13 +268,13 @@ private[twin] final class DeviceRoutes(
             implicit val actorSystem      = system
 
             val result = networkActor
-              .ask((replyTo: ActorRef[NetworkActor.HostName]) =>
+              .ask((replyTo: ActorRef[Device.RespondHostName]) =>
                 NetworkActor
                   .RequestHostname(temperatureRequest.groupId, temperatureRequest.deviceId, replyTo)
               )
               .map { res =>
                 res match {
-                  case NetworkActor.HostName(hostname) if hostname.size > 0 =>
+                  case Device.RespondHostName(hostname) if hostname.size > 0 =>
                     s"Host name is $hostname"
                   case _ => s"Hostname not found"
                 }
@@ -283,7 +283,7 @@ private[twin] final class DeviceRoutes(
 
           }
         }
-      }
+      } */
     )
 
   /*val devices: Route =

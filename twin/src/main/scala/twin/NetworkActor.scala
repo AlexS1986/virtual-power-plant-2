@@ -48,16 +48,16 @@ object NetworkActor {
       deviceTracked: Boolean
   )
 
-  final case class RequestHostname(
+  /*final case class RequestHostname(
       groupId: String,
       deviceId: String,
-      replyTo: ActorRef[HostName]
-  ) extends Command
+      replyTo: ActorRef[Device.RespondHostName]
+  ) extends Command */
 
   final case class RequestTemperature(
       groupId: String,
       deviceId: String,
-      replyTo: ActorRef[Device.RespondTemperature]
+      replyTo: ActorRef[Device.RespondData]
   ) extends Command
 
   final case class RequestAllTemperatures(
@@ -144,10 +144,11 @@ class NetworkActor(
             context.log.info(s"Checked false!")
         }
         this */
-      case RequestHostname(groupId, deviceId, replyTo) =>
+     /* case RequestHostname(groupId, deviceId, replyTo) =>
         context.log.info(s"ALERT:Hostname requested for actor $deviceId")
         val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-        device ! Device.GetHostName(replyTo)
+        device ! Device.GetHostName(replyTo) */
+
         /*deviceIdToActor.get(deviceId) match {
           case Some(deviceActor) =>
             deviceActor ! Device.GetHostName(replyTo)
@@ -157,7 +158,7 @@ class NetworkActor(
       case RequestTemperature(groupId, deviceId, replyTo) =>
         context.log.info(s"ALERT:temperature requested for actor $deviceId")
         val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-        device ! Device.ReadTemperature(1, replyTo)
+        device ! Device.ReadData(1, replyTo)
         this
 
       case StopDevice(deviceId, groupId) => 

@@ -30,7 +30,7 @@ object DeviceGroupQuery {
 
   private case object CollectionTimeout extends Command
 
-  final case class WrappedRespondTemperature(response: Device.RespondTemperature) extends Command
+  final case class WrappedRespondTemperature(response: Device.RespondData) extends Command
 
   private final case class DeviceTerminated(deviceId: String) extends Command
 }
@@ -63,7 +63,7 @@ class DeviceGroupQuery(
   deviceIdToActor.foreach {
     case (deviceId, device) =>
       //context.watchWith(device, DeviceTerminated(deviceId))
-      device ! Device.ReadTemperature(0, respondTemperatureAdapter)
+      device ! Device.ReadData(0, respondTemperatureAdapter)
   }
 
   override def onMessage(msg: Command): Behavior[Command] =
@@ -73,9 +73,9 @@ class DeviceGroupQuery(
       case CollectionTimeout                   => onCollectionTimout()
     }
 
-  private def onRespondTemperature(response: Device.RespondTemperature): Behavior[Command] = {
+  private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
-      case Device.RespondTemperature(_,_,Some(value),Some(currentHost)) => Temperature(value,currentHost)
+      case Device.RespondData(_,_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => Temperature(value,currentHost)
       case _        => TemperatureNotAvailable
     }
 

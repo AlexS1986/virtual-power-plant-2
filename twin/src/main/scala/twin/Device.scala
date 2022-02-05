@@ -38,6 +38,104 @@ import scala.util.Success
 object Device {
 
   /**
+    * Messages that a Device can process
+    */
+  sealed trait Command
+
+  /**
+    * a message that requests to return the Device Data
+    *
+    * @param requestId
+    * @param replyTo
+    */
+  final case class ReadData(
+      requestId: Long,
+      replyTo: ActorRef[RespondData]
+  ) extends Command
+
+  /**
+    * a message that represents the data sent from hardware to a Device
+    *
+    * @param requestId
+    * @param capacity
+    * @param chargeStatus
+    * @param deliveredEnergy
+    * @param deliveredEnergyDate
+    * @param replyTo
+    */
+  final case class RecordData(
+      requestId: Long,
+      capacity: Double,
+      chargeStatus: Double,
+      deliveredEnergy: Double,
+      deliveredEnergyDate: LocalDateTime,
+      replyTo: ActorRef[DataRecorded]
+  ) extends Command
+
+
+  /**
+    * a message that is sent by a Device in response to a ReadData message
+    *
+    * @param requestId
+    * @param deviceId
+    * @param value
+    * @param currentHost
+    */
+  /*final case class RespondData(
+      requestId: Long,
+      deviceId: String,
+      value: Option[Double],
+      currentHost : Option[String]
+  )*/
+
+  final case class RespondData(
+      requestId: Long,
+      deviceId: String,
+      state: DeviceState,
+      currentHost : Option[String]
+  )
+
+  /**
+    * a message that is sent in response to a RecordData request
+    *
+    * @param requestId
+    */
+  final case class DataRecorded(requestId: Long)
+
+  /**
+    * a request to stop the hardware associated with this Device
+    */
+  final case object StopDevice extends Command
+
+  /**
+    * states that a device can assume
+    */
+  sealed trait State
+
+  /**
+    * an instance of a state a device can assume
+    *
+    * @param capacity
+    * @param lastChargeStatusReading
+    * @param lastDeliveredEnergyReading
+    */
+  final case class DeviceState(
+    capacity: Double,
+    lastChargeStatusReading: Option[Double],
+    lastDeliveredEnergyReading: Option[Double]
+  ) extends State
+
+  sealed trait Event
+
+  final case class EventDataRecorded(
+    persistenceId: String,
+    capacity: Double,
+    chargeStatus: Double,
+    deliveredEnergy: Double,
+    deliveredEnergyDate: LocalDateTime,
+  ) extends Event
+
+  /**
     * defines a type of an entity for cluster sharding
     */
   val TypeKey: EntityTypeKey[Device.Command] =
@@ -117,181 +215,83 @@ object Device {
     */
   def apply(groupId: String, deviceId: String, persistenceId: PersistenceId, projectionTag: String): Behavior[Command] = {
     def getNewBehaviour(groupId: String, deviceId: String, lastChargeStatusReading: Option[Double]): Behavior[Command] = {
+      
+      /**
+        * helper function that returns an Effect that persists an EventDataRecorded event and sends a response
+        *
+        * @param persistenceId
+        * @param cmd
+        * @return
+        */
+      def recordData(persistenceId: String,cmd: RecordData): Effect[Event, State] = {
+        Effect.persist(EventDataRecorded(persistenceId,cmd.capacity,cmd.chargeStatus,cmd.deliveredEnergy, cmd.deliveredEnergyDate))
+          .thenRun(state => cmd.replyTo ! DataRecorded(cmd.requestId) )
+      }
+
+      /**
+        * helper function that returns the name of the host that this Device currently runs on
+        *
+        * @return
+        */
+      def getHostName() : Option[String] = {
+        Try {
+            InetAddress.getLocalHost().getHostName()
+        } match {
+          case Failure(exception) => Some("Host could not be determined. Exception" + exception.getMessage())
+          case Success(value) => Some(value)
+        }
+      }
+      
       Behaviors.setup { context =>
-        val commandHandler
-            : (State, Command) => Effect[Event, State] = { // TO getCommandHandlerfunction that predefines deviceID, so it does not need to be build every time but can access context
+
+        /**
+          * processes a Command and returns an Effect that defines which Events should be triggered and persisted
+          *
+          * @return
+          */
+        val commandHandler : (State, Command) => Effect[Event, State] = { 
           (state, cmd) =>
             state match {
               case DeviceState(capacity,lastChargeStatusReading,lastDeliveredEnergyReading) =>
                 cmd match {
                   case cmd: RecordData =>
-                    context.log.info(
-                      s"ALERT: Data recorded for device ${deviceId}"
-                    )
                     recordData(persistenceId.id, cmd)
-                  /*case cmd: RecordTemperature =>
-                    context.log.info(
-                      s"ALERT: Temperature recorded for device ${deviceId}"
-                    )
-                    recordTemperature(persistenceId.id, cmd)*/
-                  case ReadTemperature(id, replyTo) =>
-                    Effect.none.thenRun(state =>
-                      replyTo ! RespondTemperature(
-                        id,
-                        deviceId,
-                        lastChargeStatusReading,
-                        getHostName
-                      )
-                    )
-                  case Passivate => Effect.stop
+                  case ReadData(id, replyTo) =>
+                    Effect.none.thenRun(state => state match {
+                      case currentState : DeviceState => replyTo ! RespondData(id,deviceId,currentState,getHostName())
+                    })
                   case StopDevice => Effect.none.thenRun{
                     state => 
                       implicit val system : ActorSystem[_] = context.system
-                      sendDeviceCommand(StopSimulation(groupId,deviceId))
+                      HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
                   }
-                  case GetHostName(replyTo) =>
-                    Effect.none.thenRun(state => {
-                      context.log.info(
-                        s"ALERT: device $deviceId is running on host ${InetAddress.getLocalHost().getHostName()}"
-                      )
-                      replyTo ! NetworkActor.HostName(
-                        InetAddress
-                          .getLocalHost()
-                          .getHostName()
-                      )
-                    })
                 }
             }
         }
 
+        /**
+          * processes persisted Events and may change the current State
+          */
         val eventHandler: (State, Event) => State = { (state, event) =>
           (state,event) match {
-            /*case e: EventTemperatureRecorded =>
-                StateTemperature(Some(e.temperature)) */
             case (s: DeviceState,e: EventDataRecorded) => 
-              println("EVENT OCCURED!!")
               DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy))
             case _ => DeviceState(0,None,None)
 
           }
         }
 
-        context.system.log
-          .info("TAGDEVICE " + projectionTag + " TAGDEVICE")
-
-        EventSourcedBehavior[Command, Event, State](
-          persistenceId,
-          emptyState = DeviceState(0,None,None),
-          commandHandler,
-          eventHandler
-        ).withTagger(_ =>
-          Set(projectionTag)
-        ) 
+        // returns the behavior
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
       }
-  }
+    }
     getNewBehaviour(groupId,deviceId,None)
   }
 
-  
-
-  sealed trait State
-  // State
-  /*final case class StateTemperature(
-      lastTemperatureReading: Option[Double]
-  ) extends State */
-
-  final case class DeviceState(
-    capacity: Double,
-    lastChargeStatusReading: Option[Double],
-    lastDeliveredEnergyReading: Option[Double]
-  ) extends State
-
-  sealed trait Event
-
-  // Event
-  /*final case class EventTemperatureRecorded(
-      persistenceId: String,
-      temperature: Double
-  ) extends Event  */
-
-  final case class EventDataRecorded(
-    persistenceId: String,
-    capacity: Double,
-    chargeStatus: Double,
-    deliveredEnergy: Double,
-    deliveredEnergyDate: LocalDateTime,
-  ) extends Event
-
-  /*private def recordTemperature(
-      persistenceId: String,
-      cmd: RecordTemperature
-  ): Effect[Event, State] = {
-    Effect
-      .persist(
-        EventTemperatureRecorded(persistenceId, cmd.value)
-      )
-      .thenRun(state => cmd.replyTo ! TemperatureRecorded(cmd.requestId))
-  } */
-
-
-  private def recordData(
-      persistenceId: String,
-      cmd: RecordData
-  ): Effect[Event, State] = {
-    Effect
-      .persist(
-        //EventTemperatureRecorded(persistenceId, cmd.capacity)
-        EventDataRecorded(persistenceId,cmd.capacity,cmd.chargeStatus,cmd.deliveredEnergy, cmd.deliveredEnergyDate)
-      )
-      .thenRun(state => cmd.replyTo ! DataRecorded(cmd.requestId) )
-  }
-
-
-  sealed trait Command
-  final case class ReadTemperature(
-      requestId: Long,
-      replyTo: ActorRef[RespondTemperature]
-  ) extends Command
-
-  final case class RespondTemperature(
-      requestId: Long,
-      deviceId: String,
-      value: Option[Double],
-      currentHost : Option[String]
-  )
-
-  final case class RecordData(
-      requestId: Long,
-      capacity: Double,
-      chargeStatus: Double,
-      deliveredEnergy: Double,
-      deliveredEnergyDate: LocalDateTime,
-      replyTo: ActorRef[DataRecorded]
-  ) extends Command
-
-  //final case class TemperatureRecorded(requestId: Long)
-
-  final case class DataRecorded(requestId: Long)
-
-  case object Passivate extends Command
-
-  final case class GetHostName(
-      replyTo: ActorRef[NetworkActor.HostName]
-  ) extends Command
-
-  private def getHostName : Option[String] = {
-    Try {
-      InetAddress.getLocalHost().getHostName()
-    } match {
-      case Failure(exception) => Some("Host could not be determined. Exception" + exception.getMessage())
-      case Success(value) => Some(value)
-    }
-    
-  }
-
-  final case object StopDevice extends Command
-
-  
+  /**
+    * interface to the hardware device that the Device represents
+    */
+  object HardwareCommunicator {
 
     import spray.json._
     import spray.json.DefaultJsonProtocol._
@@ -304,97 +304,42 @@ object Device {
     import akka.http.scaladsl.model.HttpResponse
     import akka.http.scaladsl.Http
     import akka.http.scaladsl.model.ContentTypes
-    // messages for devices, TODO problem these messages are always dependent on how communication to devices works -> kapseln in Klasse/Netzwerk komponente?
     
-    sealed trait DeviceCommand
-    final case class StopSimulation(groupId:String, deviceId : String) extends DeviceCommand
-    implicit val stopSimulationFormat = jsonFormat2(StopSimulation)
+    /**
+      * messages that can be sent to hardware
+      */
+    sealed trait HardwareDeviceCommand
 
-  
-    private def sendDeviceCommand(deviceCommand : DeviceCommand)(implicit system: ActorSystem[_]) : Unit = {
+    /**
+      * stop a hardware device
+      *
+      * @param groupId
+      * @param deviceId
+      */
+    final case class StopHardwareDevice(groupId:String, deviceId : String) extends HardwareDeviceCommand
+    implicit val stopSimulationFormat = jsonFormat2(StopHardwareDevice)
+
+    /**
+      * sends a command to the hardware
+      *
+      * @param deviceCommand
+      * @param system
+      */
+    def sendDeviceCommand(deviceCommand : HardwareDeviceCommand)(implicit system: ActorSystem[_]) : Unit = {
+      def sendJsonViaHttp(json : JsValue, uri : String, method : HttpMethod)(implicit system: ActorSystem[_]) = {
+        val request = HttpRequest(method = method,uri = uri,entity = HttpEntity(contentType = ContentTypes.`application/json`,json.toString))
+        val responseFuture: Future[HttpResponse] = Http().singleRequest(request)
+      }
+
       deviceCommand match {
-        case stopSimulation : StopSimulation => 
+        case stopSimulation : StopHardwareDevice => 
           val simulatorConfig = system.settings.config.getConfig("simulator")
           val host = simulatorConfig.getString("host")
           val port = simulatorConfig.getString("port")
           val routeToSimulator = "http://" + host + ":" + port + "/stop"
           sendJsonViaHttp(stopSimulation.toJson, routeToSimulator,HttpMethods.POST)
       }
-      
     }
-    
-
-   private def sendJsonViaHttp(json : JsValue, uri : String, method : HttpMethod)(implicit system: ActorSystem[_]) = {
-    val request = HttpRequest(
-      method = method,
-      uri = uri,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        json.toString
-      )
-    )
-    val responseFuture: Future[HttpResponse] =
-      Http().singleRequest(request)
   }
 }
 
-/*class Device(
-    context: ActorContext[Device.Command],
-    groupId: String,
-    deviceId: String
-) extends AbstractBehavior[Device.Command](context) {
-  import Device._
-
-  var lastTemperatureReading: Option[Double] = None
-  context.log.info2(
-    "Device actor {}-{} started",
-    groupId,
-    deviceId
-  )
-
-  override def onMessage(
-      msg: Command
-  ): Behavior[Command] = {
-    msg match {
-      case RecordTemperature(id, value, replyTo) =>
-        context.log.info2(
-          "Recorded temperature reading {} with {}",
-          value,
-          id
-        )
-        lastTemperatureReading = Some(value)
-        replyTo ! TemperatureRecorded(id)
-        this
-
-      case ReadTemperature(id, replyTo) =>
-        replyTo ! RespondTemperature(
-          id,
-          deviceId,
-          lastTemperatureReading
-        )
-        this
-
-      case Passivate =>
-        Behaviors.stopped
-
-      case GetHostName(replyTo) =>
-        context.log.info(
-          s"ALERT: device $deviceId is running for user ${InetAddress.getLocalHost().getHostName()}"
-        )
-        replyTo ! NetworkActor.HostName(
-          InetAddress.getLocalHost().getHostName()
-        )
-        this
-    }
-  }
-
-  override def onSignal: PartialFunction[Signal, Behavior[Command]] = { case PostStop =>
-    context.log.info2(
-      "Device actor {}-{} stopped",
-      groupId,
-      deviceId
-    )
-    this
-  }
-
-} */
