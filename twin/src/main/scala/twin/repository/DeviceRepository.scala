@@ -21,13 +21,12 @@ trait DeviceRepository {
 }
 
 class DeviceRepositoryImpl() extends DeviceRepository {
-
-override def recordEnergyDeposit(session: ScalikeJdbcSession, vppId: String, deviceId: String,  energyDeposit: Double, timestamp: LocalDateTime): Unit = {
-    session.db.withinTx { implicit dbSession =>
-      sql"""
-          INSERT INTO energy_deposit VALUES($vppId,$deviceId,$timestamp,$energyDeposit)
-          ON CONFLICT (vpp_id,device_id,time_stamp) DO UPDATE SET energy_deposited = $energyDeposit
-         """.executeUpdate().apply()
-    } 
-  }
+  override def recordEnergyDeposit(session: ScalikeJdbcSession, vppId: String, deviceId: String,  energyDeposit: Double, timestamp: LocalDateTime): Unit = {
+      session.db.withinTx { implicit dbSession =>
+        sql"""
+            INSERT INTO energy_deposit VALUES($vppId,$deviceId,$timestamp,$energyDeposit)
+            ON CONFLICT (vpp_id,device_id,time_stamp) DO UPDATE SET energy_deposited = $energyDeposit
+          """.executeUpdate().apply()
+      } 
+    }
 }

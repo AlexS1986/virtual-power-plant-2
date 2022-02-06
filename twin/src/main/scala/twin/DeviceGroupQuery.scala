@@ -17,7 +17,7 @@ object DeviceGroupQuery {
   def apply(
       deviceIdToActor: Map[String, EntityRef[Device.Command]],
       requestId: Long,
-      requester: ActorRef[DeviceManager.RespondAllTemperatures],
+      requester: ActorRef[DeviceGroup.RespondAllData],
       timeout: FiniteDuration): Behavior[Command] = {
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
@@ -38,7 +38,7 @@ object DeviceGroupQuery {
 class DeviceGroupQuery(
     deviceIdToActor: Map[String, EntityRef[Device.Command]],
     requestId: Long,
-    requester: ActorRef[DeviceManager.RespondAllTemperatures],
+    requester: ActorRef[DeviceGroup.RespondAllData],
     timeout: FiniteDuration,
     context: ActorContext[DeviceGroupQuery.Command],
     timers: TimerScheduler[DeviceGroupQuery.Command])
@@ -47,7 +47,8 @@ class DeviceGroupQuery(
   import DeviceGroupQuery._
   import DeviceManager.DeviceNotAvailable
   import DeviceManager.DeviceTimedOut
-  import DeviceManager.RespondAllTemperatures
+  import DeviceGroup.RespondAllData
+  //import DeviceManager.RespondAllTemperatures
   import DeviceManager.Temperature
   import DeviceManager.TemperatureNotAvailable
   import DeviceManager.TemperatureReading
@@ -102,7 +103,7 @@ class DeviceGroupQuery(
 
   private def respondWhenAllCollected(): Behavior[Command] = {
     if (stillWaiting.isEmpty) {
-      requester ! RespondAllTemperatures(requestId, repliesSoFar)
+      requester ! RespondAllData(requestId, repliesSoFar)
       Behaviors.stopped
     } else {
       this

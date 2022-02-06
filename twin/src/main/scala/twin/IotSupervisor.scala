@@ -78,6 +78,7 @@ object IotSupervisor {
 
       // akka projection and access to database
       val deviceTemperatureRepository = new DeviceRepositoryImpl() // connection to database
+      
       DeviceProjection.init(context.system,deviceTemperatureRepository)
 
       new IotSupervisor(context, httpPort)

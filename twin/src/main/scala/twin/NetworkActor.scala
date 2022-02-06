@@ -34,6 +34,8 @@ object NetworkActor {
       deviceId: String
   ) extends Command
 
+  final case class WrappedRespondTrackDevice(respondTrackDevice : DeviceGroup.RespondTrackDevice) extends Command
+
    final case class RequestUnTrackDevice(
       groupId: String,
       deviceId: String
@@ -62,7 +64,7 @@ object NetworkActor {
 
   final case class RequestAllTemperatures(
     groupId: String,
-    replyTo: ActorRef[DeviceManager.RespondAllTemperatures]
+    replyTo: ActorRef[DeviceGroup.RespondAllData]
   ) extends Command
 
   /*final case class RecordTemperature(
@@ -114,13 +116,15 @@ class NetworkActor(
 
   private val sharding = ClusterSharding(context.system)
 
+  private val respondTrackDeviceAdapter = context.messageAdapter(WrappedRespondTrackDevice.apply)
+
   // val routes = new DeviceRoutes(context.system, context.self)
   // DeviceHttpServer.start(routes.devices, httpPort, context.system)
 
   override def onMessage(msg: Command): Behavior[Command] = {
     msg match {
       case trackMsg @ RequestTrackDevice(groupId, deviceId) =>
-        deviceManager ! DeviceManager.RequestTrackDevice(groupId, deviceId, context.self) // TODO why manager? manager can be removed?
+        deviceManager ! DeviceManager.RequestTrackDevice(groupId, deviceId, respondTrackDeviceAdapter) // TODO why manager? manager can be removed?
         this
 
       case RequestUnTrackDevice(groupId, deviceId) => 
@@ -129,9 +133,9 @@ class NetworkActor(
         group ! DeviceGroup.DeviceTerminated(groupId,deviceId) // Rename everything to DeviceTerminated?
         this
 
-      case DeviceManager.DeviceRegistered(deviceId) =>
+      case WrappedRespondTrackDevice(respondTrackDevice) => 
         //deviceIdToActor += deviceId -> deviceActor
-        context.log.info(s"Device $deviceId registered in Network component.")
+        context.log.info(s"Device ${respondTrackDevice.deviceId} registered in Network component.")
         this
 
       /*case CheckIfDeviceTracked(deviceId, replyTo) => // TODO can be removed
@@ -187,7 +191,7 @@ class NetworkActor(
       case RequestAllTemperatures(groupId,replyTo) =>
         context.log.info(s"ALERT:temperatures requested for group $groupId")
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceManager.RequestAllTemperatures(0,groupId,replyTo) // TODO has to be a group message
+        group ! DeviceGroup.WrappedRequestAllData(DeviceManager.RequestAllTemperatures(0,groupId,replyTo)) // TODO has to be a group message
         this
         //deviceManager ! DeviceGroup.RequestAllTemperatures()
       case RecordData(groupId, deviceId, capacity, chargeStatus,deliveredEnergy, replyTo) =>

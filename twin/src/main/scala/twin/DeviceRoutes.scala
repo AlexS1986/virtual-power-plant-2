@@ -203,7 +203,7 @@ private[twin] final class DeviceRoutes(
               implicit val timeout: Timeout = 5.seconds
               implicit val actorSystem      = system
 
-              val result = networkActor.ask((replyTo: ActorRef[DeviceManager.RespondAllTemperatures]) =>
+              val result = networkActor.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
                   NetworkActor
                     .RequestAllTemperatures(
                       temperaturesRequest.groupId,
@@ -211,7 +211,7 @@ private[twin] final class DeviceRoutes(
                     )
                 ).map{
                   import DeviceManager.TemperatureReadingJsonWriter
-                  respondAllTemperatures => respondAllTemperatures.temperatures.toJson.toString//println("RESPONSE",respondAllTemperatures.temperatures.toJson.toString)
+                  respondAllTemperatures => respondAllTemperatures.data.toJson.toString//println("RESPONSE",respondAllTemperatures.temperatures.toJson.toString)
                     
                 }
               result  

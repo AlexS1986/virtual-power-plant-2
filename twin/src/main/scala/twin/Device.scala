@@ -72,22 +72,14 @@ object Device {
       replyTo: ActorRef[DataRecorded]
   ) extends Command
 
-
   /**
     * a message that is sent by a Device in response to a ReadData message
     *
     * @param requestId
     * @param deviceId
-    * @param value
+    * @param state
     * @param currentHost
     */
-  /*final case class RespondData(
-      requestId: Long,
-      deviceId: String,
-      value: Option[Double],
-      currentHost : Option[String]
-  )*/
-
   final case class RespondData(
       requestId: Long,
       deviceId: String,
@@ -125,8 +117,20 @@ object Device {
     lastDeliveredEnergyReading: Option[Double]
   ) extends State
 
+  /**
+    * the events that change the state of this actor
+    */
   sealed trait Event
 
+  /**
+    * recorded data is transmitted from the hardware to this digital twin
+    *
+    * @param persistenceId
+    * @param capacity
+    * @param chargeStatus
+    * @param deliveredEnergy
+    * @param deliveredEnergyDate
+    */
   final case class EventDataRecorded(
     persistenceId: String,
     capacity: Double,
@@ -138,8 +142,7 @@ object Device {
   /**
     * defines a type of an entity for cluster sharding
     */
-  val TypeKey: EntityTypeKey[Device.Command] =
-    EntityTypeKey[Device.Command]("Device")
+  val TypeKey: EntityTypeKey[Device.Command] = EntityTypeKey[Device.Command]("Device")
 
   /**
     * tags that are used for devices in Akka Projection, each tag is associated with a dedicated sharded process

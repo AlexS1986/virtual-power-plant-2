@@ -25,18 +25,18 @@ object DeviceManager {
   final case class RequestTrackDevice(
       groupId: String,
       deviceId: String,
-      replyTo: ActorRef[DeviceRegistered]
+      replyTo: ActorRef[DeviceGroup.RespondTrackDevice]
   ) extends DeviceManager.Command
-      with DeviceGroup.Command
+     // with DeviceGroup.Command
 
-  final case class DeviceRegistered(deviceId: String) extends NetworkActor.Command // TODO do not extend Clients Commands
+  //final case class DeviceRegistered(deviceId: String) extends NetworkActor.Command // TODO do not extend Clients Commands
 
   final case class RequestDeviceList(
       requestId: Long,
       groupId: String,
-      replyTo: ActorRef[ReplyDeviceList]
+      replyTo: ActorRef[DeviceGroup.RespondDeviceList]
   ) extends DeviceManager.Command
-      with DeviceGroup.Command
+      //with DeviceGroup.Command
 
   final case class ReplyDeviceList(requestId: Long, ids: Set[String])
 
@@ -46,9 +46,8 @@ object DeviceManager {
   final case class RequestAllTemperatures(
       requestId: Long,
       groupId: String,
-      replyTo: ActorRef[RespondAllTemperatures]
+      replyTo: ActorRef[DeviceGroup.RespondAllData]
   ) extends DeviceGroupQuery.Command
-      with DeviceGroup.Command
       with DeviceManager.Command
 
   final case class RespondAllTemperatures(
@@ -102,7 +101,7 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case trackMsg @ RequestTrackDevice(groupId, _, replyTo) =>
         groupIdToActor.get(groupId) match {
           case Some(ref) =>
-            ref ! trackMsg
+            ref ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
           case None =>
             context.log.info("Creating device group actor for {}", groupId)
             val groupActor = sharding.entityRefFor(
@@ -111,7 +110,7 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
             //val groupActor =
             //  context.spawn(DeviceGroup(groupId), "group-" + groupId)
             //context.watchWith(groupActor, DeviceGroupTerminated(groupId))
-            groupActor ! trackMsg
+            groupActor ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
             groupIdToActor += groupId -> groupActor
         }
         this
@@ -119,9 +118,9 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case req @ RequestDeviceList(requestId, groupId, replyTo) =>
         groupIdToActor.get(groupId) match {
           case Some(ref) =>
-            ref ! req
-          case None =>
-            replyTo ! ReplyDeviceList(requestId, Set.empty)
+            ref ! DeviceGroup.WrappedRequestDeviceList(req)
+          case None => // TODO Group does not exist => error
+            replyTo ! DeviceGroup.RespondDeviceList(requestId, Set.empty)
         }
         this
 
