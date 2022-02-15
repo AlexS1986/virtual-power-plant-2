@@ -24,6 +24,7 @@ import akka.persistence.typed.scaladsl.Effect
 import akka.persistence.typed.scaladsl.EventSourcedBehavior
 import akka.protobufv3.internal.Type
 import akka.cluster.sharding.typed.scaladsl.Entity
+import java.time.LocalDateTime
 
 /**
   * represents a group of Devices, i.e. digital twins of hardware. Thus, it represents a Virtual Power Plant.
@@ -79,7 +80,7 @@ object DeviceGroup {
     *
     * @param requestAllData
     */
-  final case class WrappedRequestAllData(requestAllData : DeviceManager.RequestAllData) extends Command
+  final case class WrappedRequestAllData(requestAllData : DeviceManager.RequestAllData) extends Command // TODO remove Wrapped Requests -> bad for encapsulation, also wrapped request has more information than wrapper needs -> "wrap" messages for end user e.g. for RecordData this would be the data
 
   /**
     * this message is sent in response to a request to return the state of all its members
@@ -89,6 +90,36 @@ object DeviceGroup {
     */
   final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.TemperatureReading])
   
+  /**
+    * a message that requests to send a stop command to the hardware associated with the Device
+    *
+    * @param deviceId
+    */
+  final case class StopDevice(deviceId: String) extends Command
+
+  /**
+    * a message that requests to report the Data for a Device 
+    *
+    * @param deviceId
+    */
+  final case class RequestData(deviceId: String, replyTo: ActorRef[Device.RespondData]) extends Command
+
+  /**
+    *  a message that requests to record data from hardware in the associated Device
+    *
+    * @param deviceId
+    * @param capacity
+    * @param chargeStatus
+    * @param deliveredEnergy
+    */
+  final case class RecordData( // TODO should be associated with a timestamp, should there be a dataformat declared in Device for what a DeviceData looks like? 
+      deviceId: String,
+      capacity: Double,
+      chargeStatus: Double,
+      deliveredEnergy: Double,
+      deliveredEnergyDate: LocalDateTime
+  ) extends Command
+
   /**
     * states that this actor can assume
     */
@@ -223,7 +254,21 @@ object DeviceGroup {
                 case DeviceTerminated(_, deviceId) =>
                   context.log.info("Device actor for {} has been terminated", deviceId)
                   unregisterDevice(persistenceId, deviceId)
-                case WrappedRequestAllData(requestAllData) => requestAllData match {
+                case StopDevice(deviceId) => if(devicesRegistered.contains(deviceId)) {
+                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                    device ! Device.StopDevice
+                  }
+                  Effect.none
+                case RequestData(deviceId,replyTo) => if(devicesRegistered.contains(deviceId)) {
+                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                    device ! Device.ReadData(replyTo)
+                  }
+                  Effect.none
+                case RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, deliveredEnergyDate) => 
+                  val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                  device ! Device.RecordData(capacity,chargeStatus,deliveredEnergy,deliveredEnergyDate)
+                  Effect.none
+                case WrappedRequestAllData(requestAllData) => requestAllData match { 
                   case DeviceManager.RequestAllData(gId, replyTo) =>
                     if (gId == groupId) {
                       val deviceId2EntityRefSnapshot =  for {

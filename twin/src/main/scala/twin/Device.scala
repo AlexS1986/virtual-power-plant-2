@@ -49,7 +49,6 @@ object Device {
     * @param replyTo
     */
   final case class ReadData(
-      requestId: Long,
       replyTo: ActorRef[RespondData]
   ) extends Command
 
@@ -64,7 +63,6 @@ object Device {
     * @param replyTo
     */
   final case class RecordData(
-      requestId: Long,
       capacity: Double,
       chargeStatus: Double,
       deliveredEnergy: Double,
@@ -257,7 +255,7 @@ object Device {
                 cmd match {
                   case cmd: RecordData =>
                     recordData(persistenceId.id, cmd)
-                  case ReadData(id, replyTo) =>
+                  case ReadData(replyTo) =>
                     Effect.none.thenRun(state => state match {
                       case currentState : DeviceState => replyTo ! RespondData(deviceId,currentState,getHostName())
                     })

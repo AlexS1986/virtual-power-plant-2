@@ -104,7 +104,7 @@ class DeviceGroupQuery(
   deviceIdToActor.foreach {
     case (deviceId, device) =>
       //context.watchWith(device, DeviceTerminated(deviceId))
-      device ! Device.ReadData(0, respondTemperatureAdapter)
+      device ! Device.ReadData(respondTemperatureAdapter)
   }
 
   override def onMessage(msg: Command): Behavior[Command] =
@@ -117,7 +117,7 @@ class DeviceGroupQuery(
   private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
       case Device.RespondData(_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => Temperature(value,currentHost)
-      case _        => TemperatureNotAvailable
+      case _ => TemperatureNotAvailable
     }
 
     val deviceId = response.deviceId
