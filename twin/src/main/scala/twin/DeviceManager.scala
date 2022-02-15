@@ -10,87 +10,97 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.cluster.sharding.typed.scaladsl.EntityRef
 
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
-import spray.json._
-import spray.json.DefaultJsonProtocol._ // toJson methods etc.
-//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
-// DeviceManager
-
+/**
+  * main entry point to provide access to functionality of DeviceGroups
+  * DeviceManagers are stateless actors
+  */
 object DeviceManager {
   def apply(): Behavior[Command] =
     Behaviors.setup(context => new DeviceManager(context))
 
-  trait Command
+  /**
+    * messages that a DeviceManager can process
+    */
+  sealed trait Command
 
-  final case class RequestTrackDevice(
-      groupId: String,
-      deviceId: String,
-      replyTo: ActorRef[DeviceGroup.RespondTrackDevice]
-  ) extends DeviceManager.Command
+  /**
+    * a message that requests to track a hardware as a Device twin as member of a DeviceGroup
+    *
+    * @param groupId
+    * @param deviceId
+    * @param replyTo
+    */
+  final case class RequestTrackDevice(groupId: String, deviceId: String, replyTo: ActorRef[DeviceGroup.RespondTrackDevice]) extends DeviceManager.Command
+
+  /**
+    * a message that request to stop tracking a hardware and remove the it from the Device members of a DeviceGroup
+    *
+    * @param groupId
+    * @param deviceId
+    */
+  final case class RequestUnTrackDevice(groupId: String,deviceId: String) extends Command
+
+
+  final case class StopDevice(deviceId: String, groupId: String) extends Command
+
+
+ 
+
+   // TODO why here no answer? should be synchronously as well maybe?
      // with DeviceGroup.Command
 
   //final case class DeviceRegistered(deviceId: String) extends NetworkActor.Command // TODO do not extend Clients Commands
 
-  final case class RequestDeviceList(
+  /* final case class RequestDeviceList( // not used currently
       requestId: Long,
       groupId: String,
       replyTo: ActorRef[DeviceGroup.RespondDeviceList]
-  ) extends DeviceManager.Command
+  ) extends DeviceManager.Command 
       //with DeviceGroup.Command
 
-  final case class ReplyDeviceList(requestId: Long, ids: Set[String])
+  final case class ReplyDeviceList(requestId: Long, ids: Set[String]) */
 
-  private final case class DeviceGroupTerminated(groupId: String)
-      extends DeviceManager.Command
+  //private final case class DeviceGroupTerminated(groupId: String)
+     // extends DeviceManager.Command
 
-  final case class RequestAllTemperatures(
-      requestId: Long,
+  final case class RequestAllData(
       groupId: String,
       replyTo: ActorRef[DeviceGroup.RespondAllData]
   ) extends DeviceGroupQuery.Command
       with DeviceManager.Command
 
-  final case class RespondAllTemperatures(
+  /* final case class RespondAllTemperatures(
       requestId: Long,
       temperatures: Map[String, TemperatureReading]
-  )
+  ) */
 
 
-  implicit object TemperatureReadingJsonWriter extends RootJsonFormat[DeviceManager.TemperatureReading] {
-                    def write(temperatureReading : DeviceManager.TemperatureReading) : JsValue = {
-                      temperatureReading match {
-                        case DeviceManager.Temperature(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
-                        case DeviceManager.TemperatureNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
-                        case DeviceManager.DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
-                        case DeviceManager.DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
-                      }
-                    }
-                    def read(json : JsValue) : DeviceManager.TemperatureReading = {
-                      json.asJsObject.getFields("description") match {
-                          case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match {
-                              case Seq(JsNumber(value), JsString(currentHost)) => DeviceManager.Temperature(value.toDouble, currentHost)
-                              case _ => throw new DeserializationException("Double expected.")
-                          }
-                          case Seq(JsString(description)) if description == "temperature not available" => DeviceManager.TemperatureNotAvailable
-                          case Seq(JsString(description)) if description == "device not available" => DeviceManager.DeviceNotAvailable
-                          case Seq(JsString(description)) if description == "device timed out" => DeviceManager.DeviceTimedOut
-                          case _ => throw new DeserializationException("Temperature Reading expected.")
-                      }
-                    } // not needed here
-                  } 
+  final case class RequestData(
+      groupId: String,
+      deviceId: String,
+      replyTo: ActorRef[Device.RespondData]
+  ) extends Command
 
-  sealed trait TemperatureReading
-  final case class Temperature(value: Double, currentHost: String) extends TemperatureReading
-  case object TemperatureNotAvailable extends TemperatureReading
-  case object DeviceNotAvailable extends TemperatureReading
-  case object DeviceTimedOut extends TemperatureReading
+     final case class RecordData( // should this simply encode the state of a device?
+      groupId: String,
+      deviceId: String,
+      capacity: Double,
+      chargeStatus: Double,
+      deliveredEnergy: Double,
+      //replyTo: ActorRef[Device.DataRecorded]
+  ) extends Command
+
+
+
+  
 }
 
 class DeviceManager(context: ActorContext[DeviceManager.Command])
     extends AbstractBehavior[DeviceManager.Command](context) {
   import DeviceManager._
 
-  var groupIdToActor = Map.empty[String, EntityRef[DeviceGroup.Command]]
+  //var groupIdToActor = Map.empty[String, EntityRef[DeviceGroup.Command]]
 
   val sharding = ClusterSharding(context.system)
 
@@ -99,9 +109,12 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case trackMsg @ RequestTrackDevice(groupId, _, replyTo) =>
-        groupIdToActor.get(groupId) match {
-          case Some(ref) =>
-            ref ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
+        val groupActor = sharding.entityRefFor(DeviceGroup.TypeKey,groupId)
+        groupActor ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
+
+        /* groupIdToActor.get(groupId) match {
+          case Some(groupActor) =>
+            groupActor ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
           case None =>
             context.log.info("Creating device group actor for {}", groupId)
             val groupActor = sharding.entityRefFor(
@@ -112,24 +125,55 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
             //context.watchWith(groupActor, DeviceGroupTerminated(groupId))
             groupActor ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
             groupIdToActor += groupId -> groupActor
-        }
+        } */
         this
 
-      case req @ RequestDeviceList(requestId, groupId, replyTo) =>
-        groupIdToActor.get(groupId) match {
+      /*case req @ RequestDeviceList(requestId, groupId, replyTo) =>
+        val groupActor = sharding.entityRefFor(DeviceGroup.TypeKey,groupId)
+        groupActor !  DeviceGroup.WrappedRequestDeviceList(req)
+
+        /* groupIdToActor.get(groupId) match {
           case Some(ref) =>
             ref ! DeviceGroup.WrappedRequestDeviceList(req)
           case None => // TODO Group does not exist => error
             replyTo ! DeviceGroup.RespondDeviceList(requestId, Set.empty)
-        }
+        } */
+        this */
+      case RequestUnTrackDevice(groupId, deviceId) => 
+        context.log.info(s"ALERT:RequestUnTrackDevice($groupId,$deviceId) $deviceId")
+        val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
+        group ! DeviceGroup.DeviceTerminated(groupId,deviceId) // Rename everything to DeviceTerminated?
         this
 
-      case DeviceGroupTerminated(groupId) =>
+      /*case DeviceGroupTerminated(groupId) =>
         context.log.info(
           "Device group actor for {} has been terminated",
           groupId
         )
-        groupIdToActor -= groupId
+        //groupIdToActor -= groupId
+        this */
+      case StopDevice(deviceId, groupId) => 
+        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+        device ! Device.StopDevice
+        this
+      //TODO DeviceManager should only access DeviceGroups directly
+      case RequestData(groupId, deviceId, replyTo) => // TODO should this request maybe submitted to group first so that actors are not created randomly and only members of groups can be queried?
+        context.log.info(s"ALERT:temperature requested for actor $deviceId")
+        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+        device ! Device.ReadData(1, replyTo)
+        this
+      case RecordData(groupId, deviceId, capacity, chargeStatus, deliveredEnergy) => // TODO should this request maybe submitted to group first so that actors are not created randomly and only members of groups can be sent data to?
+        //, replyTo) =>
+        context.log.info(s"ALERT:DATA POST record requested for actor $deviceId")
+        //println(LocalDateTime.now())
+        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+        import java.time.LocalDateTime // TODO needs to come from request
+        device ! Device.RecordData(1,capacity,chargeStatus,deliveredEnergy,LocalDateTime.now()) //,replyTo) // TODO time needs to come from request 
+        this
+      case RequestAllData(groupId,replyTo) =>
+        context.log.info(s"ALERT:temperatures requested for group $groupId")
+        val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
+        group ! DeviceGroup.WrappedRequestAllData(DeviceManager.RequestAllData(groupId,replyTo)) // TODO has to be a group message
         this
     }
 

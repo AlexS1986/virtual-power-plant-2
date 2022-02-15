@@ -109,7 +109,7 @@ object HttpServerFrontend {
 
     val twinHost = system.settings.config.getConfig("twin").getString("host")
     val twinPort = system.settings.config.getConfig("twin").getString("port")
-    val routeToTwin = "http://" + twinHost + ":" + twinPort
+    val routeToTwin = "http://" + twinHost + ":" + twinPort + "/twin"
 
     val simulatorHost = system.settings.config.getConfig("simulator").getString("host")
     val simulatorPort = system.settings.config.getConfig("simulator").getString("port")
@@ -182,7 +182,7 @@ object HttpServerFrontend {
       path("vpp" / Segment) { vppId => 
         get{
           onComplete{
-            sendHttpRequest(VppIdentifier(vppId).toJson,routeToTwin+"/temperatures",HttpMethods.GET)
+            sendHttpRequest(VppIdentifier(vppId).toJson,routeToTwin+"/data-all",HttpMethods.GET)
           }{
             case Success(result) => complete(result)
             case Failure(exception) => complete(StatusCodes.InternalServerError,s"An error occurred: ${exception.getMessage}")
@@ -193,9 +193,9 @@ object HttpServerFrontend {
         concat(get {
           onComplete{
             val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
-            sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/temperature",HttpMethods.GET)
+            sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
           }{                           
-            case Success(result)    => 
+            case Success(result) => 
               onComplete {
                 val deviceDataF = Unmarshal(result).to[DeviceData]
                 deviceDataF

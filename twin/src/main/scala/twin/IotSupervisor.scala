@@ -28,6 +28,8 @@ import twin.repository.ScalikeJdbcSetup
 import twin.repository.DeviceRepositoryImpl
 import twin.projections.DeviceProjection
 
+import twin.network.DeviceHttpServer
+
 /*object IotSupervisor {
   def apply(httpPort: Int) : Behavior[Nothing] = Behaviors.setup[Nothing] {
     context =>
@@ -91,13 +93,15 @@ class IotSupervisor(context: ActorContext[IotSupervisor.Command], httpPort: Int)
     extends AbstractBehavior[IotSupervisor.Command](context) {
   context.log.info("IoT Application started")
 
+  val deviceManagers = Seq(context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager" + "A"),
+                           context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager" + "B"))
   val deviceManager: ActorRef[DeviceManager.Command] =
     context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager")
 
-  val networkActor: ActorRef[NetworkActor.Command] =
-    context.spawn[NetworkActor.Command](NetworkActor(httpPort, deviceManager), "NetworkActor")
+  /*val networkActor: ActorRef[NetworkActor.Command] =
+    context.spawn[NetworkActor.Command](NetworkActor(httpPort, deviceManager), "NetworkActor") */
 
-  val routes = new DeviceRoutes(context.system, networkActor)
+  val routes = new twin.network.DeviceRoutes(context.system, deviceManagers,deviceManager) //networkActor, deviceManager)
   DeviceHttpServer.start(routes.devices, httpPort, context.system)
 
   override def onMessage(msg: IotSupervisor.Command): Behavior[IotSupervisor.Command] = {

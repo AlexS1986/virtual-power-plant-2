@@ -57,6 +57,7 @@ object DeviceGroup {
     */
   final case class RespondTrackDevice(deviceId: String)
 
+  /*
   /**
     * this message requests this actor to return a list of its members
     *
@@ -71,13 +72,14 @@ object DeviceGroup {
     * @param ids the set of members
     */
   final case class RespondDeviceList(requestId: Long, ids: Set[String])
+  */
 
   /**
     * this message requests this actor to return the state of all its members
     *
     * @param requestAllData
     */
-  final case class WrappedRequestAllData(requestAllData : DeviceManager.RequestAllTemperatures) extends Command
+  final case class WrappedRequestAllData(requestAllData : DeviceManager.RequestAllData) extends Command
 
   /**
     * this message is sent in response to a request to return the state of all its members
@@ -85,7 +87,7 @@ object DeviceGroup {
     * @param requestId
     * @param data a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(requestId: Long, data: Map[String, TemperatureReading])
+  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.TemperatureReading])
   
   /**
     * states that this actor can assume
@@ -208,7 +210,7 @@ object DeviceGroup {
                       )
                       Effect.none
                   }
-                case WrappedRequestDeviceList(requestDeviceList) => requestDeviceList match {
+                /*case WrappedRequestDeviceList(requestDeviceList) => requestDeviceList match {
                   case DeviceManager.RequestDeviceList(requestId, gId, replyTo) =>
                     if (gId == groupId) {
                       Effect.none.thenRun(state =>
@@ -217,19 +219,19 @@ object DeviceGroup {
                     } else {
                       Effect.none.thenRun(state => ())
                     }   
-                } 
+                }*/ 
                 case DeviceTerminated(_, deviceId) =>
                   context.log.info("Device actor for {} has been terminated", deviceId)
                   unregisterDevice(persistenceId, deviceId)
                 case WrappedRequestAllData(requestAllData) => requestAllData match {
-                  case DeviceManager.RequestAllTemperatures(requestId, gId, replyTo) =>
+                  case DeviceManager.RequestAllData(gId, replyTo) =>
                     if (gId == groupId) {
                       val deviceId2EntityRefSnapshot =  for {
                         dId <- devicesRegistered
                       } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
                                         
                       context.spawnAnonymous(
-                        DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap, requestId = requestId,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
+                        DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap, requestId = 0,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
                       Effect.none
                     } else
                       Effect.unhandled

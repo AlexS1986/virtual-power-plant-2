@@ -98,9 +98,9 @@ object HttpServerWithActorInteraction {
     val twinConfig             = system.settings.config.getConfig("twin")
     val host                   = twinConfig.getString("host")
     val port                   = twinConfig.getString("port")
-    val routeToPostData = "http://" + host + ":" + port + "/data"
-    val routeToPostStop = "http://" + host + ":" + port + "/untrack-device"
-    val routeToPostStart = "http://" + host + ":" + port + "/track-device"
+    val routeToPostData = "http://" + host + ":" + port + "/twin" + "/data"
+    val routeToPostStop = "http://" + host + ":" + port + "/twin" + "/untrack-device"
+    val routeToPostStart = "http://" + host + ":" + port + "/twin"  + "/track-device"
 
     //val minikubeConfig = system.settings.config.getConfig("minikube")
     //val minikubeIp = minikubeConfig.getString("ip")

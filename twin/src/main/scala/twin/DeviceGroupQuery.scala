@@ -12,6 +12,13 @@ import akka.actor.typed.scaladsl.AbstractBehavior
 import akka.cluster.sharding.typed.scaladsl.EntityRef
 
 
+import spray.json._
+import spray.json.DefaultJsonProtocol._ // toJson methods etc.
+//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+
+import java.time.LocalDateTime
+
+
 object DeviceGroupQuery {
 
   def apply(
@@ -33,6 +40,37 @@ object DeviceGroupQuery {
   final case class WrappedRespondTemperature(response: Device.RespondData) extends Command
 
   private final case class DeviceTerminated(deviceId: String) extends Command
+
+
+
+  implicit object TemperatureReadingJsonWriter extends RootJsonFormat[TemperatureReading] {
+                    def write(temperatureReading : TemperatureReading) : JsValue = {
+                      temperatureReading match {
+                        case Temperature(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
+                        case TemperatureNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
+                        case DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
+                        case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
+                      }
+                    }
+                    def read(json : JsValue) : TemperatureReading = {
+                      json.asJsObject.getFields("description") match {
+                          case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match {
+                              case Seq(JsNumber(value), JsString(currentHost)) => Temperature(value.toDouble, currentHost)
+                              case _ => throw new DeserializationException("Double expected.")
+                          }
+                          case Seq(JsString(description)) if description == "temperature not available" => TemperatureNotAvailable
+                          case Seq(JsString(description)) if description == "device not available" => DeviceNotAvailable
+                          case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
+                          case _ => throw new DeserializationException("Temperature Reading expected.")
+                      }
+                    } // not needed here
+                  } 
+
+  sealed trait TemperatureReading
+  final case class Temperature(value: Double, currentHost: String) extends TemperatureReading
+  case object TemperatureNotAvailable extends TemperatureReading
+  case object DeviceNotAvailable extends TemperatureReading
+  case object DeviceTimedOut extends TemperatureReading
 }
 
 class DeviceGroupQuery(
@@ -45,13 +83,15 @@ class DeviceGroupQuery(
     extends AbstractBehavior[DeviceGroupQuery.Command](context) {
 
   import DeviceGroupQuery._
-  import DeviceManager.DeviceNotAvailable
-  import DeviceManager.DeviceTimedOut
   import DeviceGroup.RespondAllData
-  //import DeviceManager.RespondAllTemperatures
-  import DeviceManager.Temperature
-  import DeviceManager.TemperatureNotAvailable
-  import DeviceManager.TemperatureReading
+
+  // import DeviceManager.DeviceNotAvailable
+  // import DeviceManager.DeviceTimedOut
+  
+  // //import DeviceManager.RespondAllTemperatures
+  // import DeviceManager.Temperature
+  // import DeviceManager.TemperatureNotAvailable
+  // import DeviceManager.TemperatureReading
 
   timers.startSingleTimer(CollectionTimeout, CollectionTimeout, timeout)
 
@@ -76,7 +116,7 @@ class DeviceGroupQuery(
 
   private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
-      case Device.RespondData(_,_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => Temperature(value,currentHost)
+      case Device.RespondData(_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => Temperature(value,currentHost)
       case _        => TemperatureNotAvailable
     }
 

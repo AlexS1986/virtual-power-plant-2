@@ -17,16 +17,16 @@ echo $http_port
 
 #record and retrieve temperature
 #test
-echo $(curl -XGET http://192.168.49.2:$http_port/temperature -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
+echo $(curl -XGET http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 
 #test
-echo $(curl -XPOST http://192.168.49.2:$http_port/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2", "capacity" : 100, "chargeStatus" : 80, "deliveredEnergy" : 0}')
+echo $(curl -XPOST http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2", "capacity" : 100, "chargeStatus" : 80, "deliveredEnergy" : 0}')
 
-echo $(curl -v -XGET http://192.168.49.2:$http_port/temperature -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
+echo $(curl -v -XGET http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 
 
-echo $(curl -v -XPOST http://192.168.49.2:$http_port/track-device -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
-echo $(curl -v -XGET http://192.168.49.2:$http_port/temperatures -H "Content-Type: application/json" --data '{"groupId":"group2"}')
+echo $(curl -v -XPOST http://192.168.49.2:$http_port/twin/track-device -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
+echo $(curl -v -XGET http://192.168.49.2:$http_port/twin/data-all -H "Content-Type: application/json" --data '{"groupId":"group2"}')
 
 
 #echo $(curl -XGET http://10.111.136.207:30080/temperature -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')

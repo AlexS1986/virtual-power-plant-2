@@ -38,7 +38,7 @@ import scala.util.Success
 object Device {
 
   /**
-    * Messages that a Device can process
+    * messages that a Device can process
     */
   sealed trait Command
 
@@ -69,7 +69,6 @@ object Device {
       chargeStatus: Double,
       deliveredEnergy: Double,
       deliveredEnergyDate: LocalDateTime,
-      replyTo: ActorRef[DataRecorded]
   ) extends Command
 
   /**
@@ -81,7 +80,6 @@ object Device {
     * @param currentHost
     */
   final case class RespondData(
-      requestId: Long,
       deviceId: String,
       state: DeviceState,
       currentHost : Option[String]
@@ -161,7 +159,7 @@ object Device {
       val selectedTag = tags(i)
       Device(entityContext.entityId,persistenceId,selectedTag)
     }
-    ClusterSharding(system).init(Entity(TypeKey)(behaviorFactory))
+    val shardRegionReference = ClusterSharding(system).init(Entity(TypeKey)(behaviorFactory))
   }
 
   /**
@@ -228,7 +226,7 @@ object Device {
         */
       def recordData(persistenceId: String,cmd: RecordData): Effect[Event, State] = {
         Effect.persist(EventDataRecorded(persistenceId,cmd.capacity,cmd.chargeStatus,cmd.deliveredEnergy, cmd.deliveredEnergyDate))
-          .thenRun(state => cmd.replyTo ! DataRecorded(cmd.requestId) )
+          //.thenRun(state => cmd.replyTo ! DataRecorded(cmd.requestId) )
       }
 
       /**
@@ -261,7 +259,7 @@ object Device {
                     recordData(persistenceId.id, cmd)
                   case ReadData(id, replyTo) =>
                     Effect.none.thenRun(state => state match {
-                      case currentState : DeviceState => replyTo ! RespondData(id,deviceId,currentState,getHostName())
+                      case currentState : DeviceState => replyTo ! RespondData(deviceId,currentState,getHostName())
                     })
                   case StopDevice => Effect.none.thenRun{
                     state => 
