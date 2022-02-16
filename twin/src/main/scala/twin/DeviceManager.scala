@@ -103,45 +103,31 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
 
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
-      case trackMsg @ RequestTrackDevice(groupId, _, replyTo) =>
+      case trackMsg @ RequestTrackDevice(groupId, deviceId, replyTo) =>
+        context.log.info(s"[RequestTrackDevice($groupId,$deviceId,$replyTo) received]")
         val groupActor = sharding.entityRefFor(DeviceGroup.TypeKey,groupId)
-        groupActor ! DeviceGroup.WrappedRequestTrackDevice(trackMsg)
+        groupActor ! DeviceGroup.RequestTrackDevice(deviceId,replyTo)
         this
       case RequestUnTrackDevice(groupId, deviceId) => 
-        context.log.info(s"ALERT:RequestUnTrackDevice($groupId,$deviceId) $deviceId")
+        context.log.info(s"[RequestUnTrackDevice($groupId,$deviceId) received]")
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.DeviceTerminated(groupId,deviceId) // Rename everything to DeviceTerminated?
         this
       case StopDevice(deviceId, groupId) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.StopDevice(deviceId)
-        //val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-        //device ! Device.StopDevice
         this
-      //TODO DeviceManager should only access DeviceGroups directly
-      case RequestData(groupId, deviceId, replyTo) => // TODO should this request maybe submitted to group first so that actors are not created randomly and only members of groups can be queried?
+      case RequestData(groupId, deviceId, replyTo) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.RequestData(deviceId, replyTo)
-
-        /*context.log.info(s"ALERT:temperature requested for actor $deviceId")
-        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-        device ! Device.ReadData(1, replyTo)*/
         this
-      case RecordData(groupId, deviceId, capacity, chargeStatus, deliveredEnergy) => // TODO should this request maybe submitted to group first so that actors are not created randomly and only members of groups can be sent data to?
+      case RecordData(groupId, deviceId, capacity, chargeStatus, deliveredEnergy) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, LocalDateTime.now())
-        
-        //, replyTo) =>
-        //context.log.info(s"ALERT:DATA POST record requested for actor $deviceId")
-        //println(LocalDateTime.now())
-        //val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-        //import java.time.LocalDateTime // TODO needs to come from request
-        //device ! Device.RecordData(capacity,chargeStatus,deliveredEnergy,LocalDateTime.now()) //,replyTo) // TODO time needs to come from request 
         this
       case RequestAllData(groupId,replyTo) =>
-        context.log.info(s"ALERT:temperatures requested for group $groupId")
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.WrappedRequestAllData(DeviceManager.RequestAllData(groupId,replyTo)) // TODO has to be a group message
+        group ! DeviceGroup.RequestAllData(replyTo) 
         this
     }
 

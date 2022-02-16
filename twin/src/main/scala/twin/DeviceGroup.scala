@@ -47,9 +47,10 @@ object DeviceGroup {
   /**
     * this message requests this actor to add a member
     *
-    * @param requestTrackDevice
+    * @param deviceId
+    * @param replyTo
     */
-  final case class WrappedRequestTrackDevice(requestTrackDevice : DeviceManager.RequestTrackDevice) extends Command
+  final case class RequestTrackDevice(deviceId: String, replyTo: ActorRef[DeviceGroup.RespondTrackDevice]) extends Command
 
   /**
     * this message is sent as a positive response to a request to track this device
@@ -58,29 +59,12 @@ object DeviceGroup {
     */
   final case class RespondTrackDevice(deviceId: String)
 
-  /*
-  /**
-    * this message requests this actor to return a list of its members
-    *
-    * @param requestDeviceList
-    */
-  final case class WrappedRequestDeviceList(requestDeviceList : DeviceManager.RequestDeviceList) extends Command
-
-  /**
-    * this message is sent in response to a request to list all members of this actor
-    *
-    * @param requestId
-    * @param ids the set of members
-    */
-  final case class RespondDeviceList(requestId: Long, ids: Set[String])
-  */
-
   /**
     * this message requests this actor to return the state of all its members
     *
-    * @param requestAllData
+    * @param replyTo
     */
-  final case class WrappedRequestAllData(requestAllData : DeviceManager.RequestAllData) extends Command // TODO remove Wrapped Requests -> bad for encapsulation, also wrapped request has more information than wrapper needs -> "wrap" messages for end user e.g. for RecordData this would be the data
+  final case class RequestAllData(replyTo: ActorRef[DeviceGroup.RespondAllData]) extends Command
 
   /**
     * this message is sent in response to a request to return the state of all its members
@@ -88,7 +72,7 @@ object DeviceGroup {
     * @param requestId
     * @param data a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.TemperatureReading])
+  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.TemperatureReading]) 
   
   /**
     * a message that requests to send a stop command to the hardware associated with the Device
@@ -220,8 +204,8 @@ object DeviceGroup {
           state match {
             case StateDevicesRegistered(devicesRegistered) =>
               cmd match {
-                case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
-                    case trackMsg @ DeviceManager.RequestTrackDevice(`groupId`, deviceId, replyTo) =>
+                //case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
+                    case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
                       if (devicesRegistered(deviceId)) {
                           val entityRef = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
                           Effect.none.thenRun(state => replyTo ! RespondTrackDevice(deviceId)) //DeviceRegistered(deviceId))
@@ -233,14 +217,14 @@ object DeviceGroup {
                           ) 
                           registerDevice(persistenceId, deviceId, replyTo)
                       }
-                    case DeviceManager.RequestTrackDevice(gId, _, _) =>
+                    /*case DeviceManager.RequestTrackDevice(gId, _, _) =>
                       context.log.warn2(
                         "Ignoring TrackDevice request for {}. This actor is responsible for {}.",
                         gId,
                         groupId
                       )
-                      Effect.none
-                  }
+                      Effect.none */
+                  //}
                 /*case WrappedRequestDeviceList(requestDeviceList) => requestDeviceList match {
                   case DeviceManager.RequestDeviceList(requestId, gId, replyTo) =>
                     if (gId == groupId) {
@@ -265,10 +249,20 @@ object DeviceGroup {
                   }
                   Effect.none
                 case RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, deliveredEnergyDate) => 
-                  val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                  device ! Device.RecordData(capacity,chargeStatus,deliveredEnergy,deliveredEnergyDate)
+                  if(devicesRegistered.contains(deviceId)) {
+                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                    device ! Device.RecordData(capacity,chargeStatus,deliveredEnergy,deliveredEnergyDate)
+                  } 
                   Effect.none
-                case WrappedRequestAllData(requestAllData) => requestAllData match { 
+                case RequestAllData(replyTo) =>
+                  val deviceId2EntityRefSnapshot =  for {
+                        dId <- devicesRegistered
+                      } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
+                  context.spawnAnonymous(
+                        DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap, requestId = 0,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
+                      Effect.none
+                  
+                   /* requestAllData match { 
                   case DeviceManager.RequestAllData(gId, replyTo) =>
                     if (gId == groupId) {
                       val deviceId2EntityRefSnapshot =  for {
@@ -280,7 +274,7 @@ object DeviceGroup {
                       Effect.none
                     } else
                       Effect.unhandled
-                }   
+                } */   
               }
           }
         }
