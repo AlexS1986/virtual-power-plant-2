@@ -11,14 +11,13 @@ import akka.actor.typed.scaladsl.AbstractBehavior
 // Cluster Sharding
 import akka.cluster.sharding.typed.scaladsl.EntityRef
 
-
 import spray.json._
-import spray.json.DefaultJsonProtocol._ // toJson methods etc.
-//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-
+import spray.json.DefaultJsonProtocol._ 
 import java.time.LocalDateTime
 
-
+/**
+  * an actor that is spawned to manage a query for the status of all Devices currently belonging to a DeviceGroup
+  */
 object DeviceGroupQuery {
 
   def apply(
@@ -33,44 +32,85 @@ object DeviceGroupQuery {
     }
   }
 
-  trait Command
+  /**
+    * the messages that this actor type can process
+    */
+  sealed trait Command
 
-  private case object CollectionTimeout extends Command
+  /**
+    * this message is sent to this actor when the time limit for waiting for responses from queried Device's has passed
+    */
+  private final case object CollectionTimeout extends Command
 
-  final case class WrappedRespondTemperature(response: Device.RespondData) extends Command
+  /**
+    * this message is sent to this actor in order to report data from a particular Device
+    *
+    * @param response
+    */
+  private final case class WrappedRespondData(response: Device.RespondData) extends Command
 
-  private final case class DeviceTerminated(deviceId: String) extends Command
+  /**
+    * this message is sent to this actor from devices that have been stopped while the query represented by this actor was processed
+    *
+    * @param deviceId
+    */
+  //private final case class DeviceTerminated(deviceId: String) extends Command
 
 
+  /**
+    * required to read and write objects of a type with multiple subtypes
+    */
+  implicit object DataReadingJsonWriter extends RootJsonFormat[DataReading] {
+    def write(DataReading : DataReading) : JsValue = {
+      DataReading match {
+        case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
+        case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
+        //case DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
+        case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
+      }
+    }
+                                  
+    def read(json : JsValue) : DataReading = {
+      json.asJsObject.getFields("description") match {
+        case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match {
+          case Seq(JsNumber(value), JsString(currentHost)) => DeviceData(value.toDouble, currentHost)
+          case _ => throw new DeserializationException("Double expected.")
+        }
+        case Seq(JsString(description)) if description == "temperature not available" => DataNotAvailable
+        //case Seq(JsString(description)) if description == "device not available" => DeviceNotAvailable
+        case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
+        case _ => throw new DeserializationException("Temperature Reading expected.")
+      }
+    } 
+  } 
 
-  implicit object TemperatureReadingJsonWriter extends RootJsonFormat[TemperatureReading] {
-                    def write(temperatureReading : TemperatureReading) : JsValue = {
-                      temperatureReading match {
-                        case Temperature(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
-                        case TemperatureNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
-                        case DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
-                        case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
-                      }
-                    }
-                    def read(json : JsValue) : TemperatureReading = {
-                      json.asJsObject.getFields("description") match {
-                          case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match {
-                              case Seq(JsNumber(value), JsString(currentHost)) => Temperature(value.toDouble, currentHost)
-                              case _ => throw new DeserializationException("Double expected.")
-                          }
-                          case Seq(JsString(description)) if description == "temperature not available" => TemperatureNotAvailable
-                          case Seq(JsString(description)) if description == "device not available" => DeviceNotAvailable
-                          case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
-                          case _ => throw new DeserializationException("Temperature Reading expected.")
-                      }
-                    } // not needed here
-                  } 
+  /**
+    * this type defines the status of Devices that are queried by this actor
+    */
+  sealed trait DataReading
 
-  sealed trait TemperatureReading
-  final case class Temperature(value: Double, currentHost: String) extends TemperatureReading
-  case object TemperatureNotAvailable extends TemperatureReading
-  case object DeviceNotAvailable extends TemperatureReading
-  case object DeviceTimedOut extends TemperatureReading
+  /**
+    * Device data that has been reported successfully 
+    *
+    * @param value
+    * @param currentHost
+    */
+  final case class DeviceData(value: Double, currentHost: String) extends DataReading
+
+  /**
+    * Data has not been reported completely yet at the Device
+    */
+  case object DataNotAvailable extends DataReading
+
+  /**
+    * this Device has been requested to stop before the query represented by this actor could finish
+    */
+  //case object DeviceNotAvailable extends DataReading
+
+  /**
+    * this Device has not responded in time
+    */
+  case object DeviceTimedOut extends DataReading
 }
 
 class DeviceGroupQuery(
@@ -85,19 +125,11 @@ class DeviceGroupQuery(
   import DeviceGroupQuery._
   import DeviceGroup.RespondAllData
 
-  // import DeviceManager.DeviceNotAvailable
-  // import DeviceManager.DeviceTimedOut
-  
-  // //import DeviceManager.RespondAllTemperatures
-  // import DeviceManager.Temperature
-  // import DeviceManager.TemperatureNotAvailable
-  // import DeviceManager.TemperatureReading
-
   timers.startSingleTimer(CollectionTimeout, CollectionTimeout, timeout)
 
-  private val respondTemperatureAdapter = context.messageAdapter(WrappedRespondTemperature.apply)
+  private val respondTemperatureAdapter = context.messageAdapter(WrappedRespondData.apply)
 
-  private var repliesSoFar = Map.empty[String, TemperatureReading]
+  private var repliesSoFar = Map.empty[String, DataReading]
   private var stillWaiting = deviceIdToActor.keySet
 
 
@@ -109,15 +141,15 @@ class DeviceGroupQuery(
 
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
-      case WrappedRespondTemperature(response) => onRespondTemperature(response)
-      case DeviceTerminated(deviceId)          => onDeviceTerminated(deviceId)
-      case CollectionTimeout                   => onCollectionTimout()
+      case WrappedRespondData(response) => onRespondTemperature(response)
+      //case DeviceTerminated(deviceId) => onDeviceTerminated(deviceId)
+      case CollectionTimeout => onCollectionTimout()
     }
 
   private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
-      case Device.RespondData(_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => Temperature(value,currentHost)
-      case _ => TemperatureNotAvailable
+      case Device.RespondData(_,Device.DeviceState(_,Some(value),_),Some(currentHost)) => DeviceData(value,currentHost)
+      case _ => DataNotAvailable
     }
 
     val deviceId = response.deviceId
@@ -127,13 +159,13 @@ class DeviceGroupQuery(
     respondWhenAllCollected()
   }
 
-  private def onDeviceTerminated(deviceId: String): Behavior[Command] = {
+  /*private def onDeviceTerminated(deviceId: String): Behavior[Command] = {
     if (stillWaiting(deviceId)) {
       repliesSoFar += (deviceId -> DeviceNotAvailable)
       stillWaiting -= deviceId
     }
     respondWhenAllCollected()
-  }
+  } */
 
   private def onCollectionTimout(): Behavior[Command] = {
     repliesSoFar ++= stillWaiting.map(deviceId => deviceId -> DeviceTimedOut)

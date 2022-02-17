@@ -67,15 +67,15 @@ $(document).ready(function () {
                 if (this.status == 200) {
                     if (this.responseText != null) {
                         var o = JSON.parse(this.response)
-                        if(Object.keys(o).length === 0 && o.constructor === Object) { // test if response is an empty object       
+                        var deviceDataFromServer = o
+                        vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer,this.myParameters)
+                        
+                        /*if(Object.keys(o).length === 0 && o.constructor === Object) { // test if response is an empty object       
                         } else {
                             var deviceDataFromServer = o
                             vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer,this.myParameters)
-                            // handle results from readside
-                            /*var deviceDataFromServer = o.devicesAndTemperatures
-                            vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer)
-                            vppOverview.plot()*/
-                        }
+    
+                        }*/
                         vppOverview.plot()
                         /*var deviceDataFromServer = o.devicesAndTemperatures
                         vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer)

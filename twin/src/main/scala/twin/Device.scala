@@ -95,6 +95,8 @@ object Device {
     */
   final case object StopDevice extends Command
 
+  //final case object DeviceUntracked extends Command
+
   /**
     * states that a device can assume
     */
@@ -259,7 +261,7 @@ object Device {
                     Effect.none.thenRun(state => state match {
                       case currentState : DeviceState => replyTo ! RespondData(deviceId,currentState,getHostName())
                     })
-                  case StopDevice => Effect.none.thenRun{
+                  case StopDevice => Effect.none.thenRun{ //TODO should also use change state to stopped? which would be handled by 
                     state => 
                       implicit val system : ActorSystem[_] = context.system
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))

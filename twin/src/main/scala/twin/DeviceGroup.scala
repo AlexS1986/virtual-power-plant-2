@@ -42,7 +42,7 @@ object DeviceGroup {
     * @param groupId
     * @param deviceId
     */
-  final case class DeviceTerminated(groupId: String, deviceId: String) extends Command
+  final case class RequestUnTrackDevice(groupId: String, deviceId: String) extends Command
 
   /**
     * this message requests this actor to add a member
@@ -72,7 +72,7 @@ object DeviceGroup {
     * @param requestId
     * @param data a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.TemperatureReading]) 
+  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.DataReading]) 
   
   /**
     * a message that requests to send a stop command to the hardware associated with the Device
@@ -194,7 +194,6 @@ object DeviceGroup {
 
 
       Behaviors.setup { context =>
-
         /**
             * processes a Command and returns an Effect that defines which Events should be triggered and persisted
             *
@@ -205,18 +204,15 @@ object DeviceGroup {
             case StateDevicesRegistered(devicesRegistered) =>
               cmd match {
                 //case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
-                    case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
-                      if (devicesRegistered(deviceId)) {
-                          val entityRef = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                          Effect.none.thenRun(state => replyTo ! RespondTrackDevice(deviceId)) //DeviceRegistered(deviceId))
-                      } else {
-                        context.log.info("Creating device actor for {}", trackMsg.deviceId)
-                        val deviceActor = sharding.entityRefFor(
-                            Device.TypeKey,
-                            Device.makeEntityId(groupId, deviceId)
-                          ) 
-                          registerDevice(persistenceId, deviceId, replyTo)
-                      }
+                  case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
+                    if (devicesRegistered(deviceId)) {
+                      val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                      Effect.none.thenRun(state => replyTo ! RespondTrackDevice(deviceId)) //DeviceRegistered(deviceId))
+                    } else {
+                      context.log.info("Creating device actor for {}", trackMsg.deviceId)
+                      val device = sharding.entityRefFor(Device.TypeKey,Device.makeEntityId(groupId, deviceId)) 
+                      registerDevice(persistenceId, deviceId, replyTo)
+                    }
                     /*case DeviceManager.RequestTrackDevice(gId, _, _) =>
                       context.log.warn2(
                         "Ignoring TrackDevice request for {}. This actor is responsible for {}.",
@@ -235,7 +231,7 @@ object DeviceGroup {
                       Effect.none.thenRun(state => ())
                     }   
                 }*/ 
-                case DeviceTerminated(_, deviceId) =>
+                case RequestUnTrackDevice(_, deviceId) =>
                   context.log.info("Device actor for {} has been terminated", deviceId)
                   unregisterDevice(persistenceId, deviceId)
                 case StopDevice(deviceId) => if(devicesRegistered.contains(deviceId)) {

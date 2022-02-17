@@ -27,10 +27,9 @@ private[twin] final class DeviceRoutes(
     system: ActorSystem[_],
     //networkActor: ActorRef[NetworkActor.Command],
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
-    deviceManager: ActorRef[DeviceManager.Command] // TODO array of deviceManagers that serve requests in round robin manner?
+    //deviceManager: ActorRef[DeviceManager.Command] // TODO array of deviceManagers that serve requests in round robin manner?
 ) {
 
-  
   final case class StopDevice(deviceId: String, groupId: String)
   implicit val stopDeviceFormat  = jsonFormat2(StopDevice)
 
@@ -171,7 +170,7 @@ private[twin] final class DeviceRoutes(
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
                   DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo)) // TODO request ID? not necessary if ask syncronously which has to be done here to respond
                   .map {
-                    import DeviceGroupQuery.TemperatureReadingJsonWriter
+                    import DeviceGroupQuery.DataReadingJsonWriter
                     respondData => respondData.data.toJson.toString   
                   }
                 case None => throw new Exception("Internal server error")

@@ -52,14 +52,28 @@ class VPPOverview {
             var device = deviceDataFromServer[deviceId]
            
             var uniqueId = DeviceSimulator.createDeviceIndentifier(groupId,deviceId)
-            if (uniqueId in this.deviceSimulatorsToRender) {
+            //const isInServerDataAndIsInLocalData = uniqueId in this.deviceSimulatorsToRender
+
+            const isInServerDataAndIsInLocalDataAndRequestedToStop = (uniqueId in this.deviceSimulatorsToRender) && (this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive")
+            if (isInServerDataAndIsInLocalDataAndRequestedToStop) {
+                this.deviceSimulatorsToRender[uniqueId].stopSimulation()
+            }
+
+            const isInServerDataButIsNotInLocalData = !(uniqueId in this.deviceSimulatorsToRender)
+            if(isInServerDataButIsNotInLocalData) {
+                this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId,groupId)
+            }
+
+
+            /*if (isInServerDataAndIsInLocalData) {
+                const isInServerDataAndIsInLocalDataAndRequestedToStop = this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive"
                 if(this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive") { // do"passive" as a field, is passive but still sends data, maybe because message was not delivered correctly
                     this.deviceSimulatorsToRender[uniqueId].stopSimulation()
                 }
             } else {
                 this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId,groupId)
                 // send start notification is not necessary since actor state is rendered and not DB
-            }
+            } */
 
             var dataDescription = device.description
             if(dataDescription == "temperature") {// data is availables
@@ -76,8 +90,10 @@ class VPPOverview {
         // passivate those DeviceSimulators that are stopped at Server
         for (const key of Object.keys(this.deviceSimulatorsToRender)) {
             var parsedDeviceIdentifier = (DeviceSimulator.parseDeviceIdentifier(key))
-            if (!(deviceDataFromServer.hasOwnProperty(parsedDeviceIdentifier.deviceId)) && (parsedDeviceIdentifier.groupId == groupId)) { 
-                this.deviceSimulatorsToRender[key].simulationState = "passive"
+
+            const isInLocalDataButNotInServerDataAndGroupMatchesAndStopClicked = !(deviceDataFromServer.hasOwnProperty(parsedDeviceIdentifier.deviceId)) && (parsedDeviceIdentifier.groupId == groupId) && (this.deviceSimulatorsToRender[key].simulationState == "passive")
+            if (isInLocalDataButNotInServerDataAndGroupMatchesAndStopClicked) { 
+                this.deviceSimulatorsToRender[key].simulationState = "noPlot"
             }
         }
 
@@ -189,7 +205,7 @@ class VPPOverview {
             var deviceSimulatorToRender = this.deviceSimulatorsToRender[keys[i]]
             //deviceSimulatorToRender.sendStopNotificationToServer() // TODO remove
             const tr = tbl.insertRow();
-            if (deviceSimulatorToRender.getSimulationState() == "active")  {
+            if (deviceSimulatorToRender.getSimulationState() != "noPlot")  {
                 const tdId = tr.insertCell();
                 tdId.appendChild(document.createTextNode(deviceSimulatorToRender.deviceId))
                 //tdId.style.border = '1px solid black';
