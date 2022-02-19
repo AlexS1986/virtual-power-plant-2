@@ -9,7 +9,10 @@ import akka.{Done, actor => classic}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 
-private[twin] object DeviceHttpServer {
+/**
+  * a http Server for the Twin Microservice
+  */
+private[twin] object TwinHttpServer {
     def start(routes: Route, port: Int, system: ActorSystem[_]) : Unit = {
 
         import akka.actor.typed.scaladsl.adapter._

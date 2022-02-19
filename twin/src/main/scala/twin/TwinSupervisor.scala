@@ -25,18 +25,18 @@ import akka.cluster.typed.{Cluster, Subscribe}
 import twin.repository.ScalikeJdbcSetup
 import twin.repository.DeviceRepositoryImpl
 import twin.projections.DeviceProjection
-import twin.network.DeviceHttpServer
+import twin.network.TwinHttpServer
 
-// the user guardian of the VPP application
-object IotSupervisor {
+// the user guardian of the twin Microservice
+object TwinSupervisor {
 
   /**
     * the messages that this actor can process
     */
   trait Command 
 
-  def apply(httpPort: Int): Behavior[IotSupervisor.Command] = {
-    Behaviors.setup[IotSupervisor.Command](context => {
+  def apply(httpPort: Int): Behavior[TwinSupervisor.Command] = {
+    Behaviors.setup[TwinSupervisor.Command](context => {
 
       val cluster = Cluster(context.system)
       context.log.info("Started [" + context.system + "], cluster.selfAddress = " + cluster.selfMember.address + ")")
@@ -79,9 +79,9 @@ object IotSupervisor {
 
 }
 
-class IotSupervisor(context: ActorContext[IotSupervisor.Command], httpPort: Int)
-    extends AbstractBehavior[IotSupervisor.Command](context) {
-  context.log.info("IoT Application started")
+class IotSupervisor(context: ActorContext[TwinSupervisor.Command], httpPort: Int)
+    extends AbstractBehavior[TwinSupervisor.Command](context) {
+  context.log.info("Twin Microservice started")
 
   // spawn DeviceManager actors that provice access to application
   val deviceManagers = Seq(context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager" + "A"),
@@ -89,26 +89,26 @@ class IotSupervisor(context: ActorContext[IotSupervisor.Command], httpPort: Int)
   
   // spawn http-server
   val routes = new twin.network.DeviceRoutes(context.system, deviceManagers)
-  DeviceHttpServer.start(routes.devices, httpPort, context.system)
+  TwinHttpServer.start(routes.devices, httpPort, context.system)
 
-  override def onMessage(msg: IotSupervisor.Command): Behavior[IotSupervisor.Command] = {
+  override def onMessage(msg: TwinSupervisor.Command): Behavior[TwinSupervisor.Command] = {
     // No need to handle any messages since supervisor just spawns other actors and server
     Behaviors.unhandled
   }
 
-  override def onSignal: PartialFunction[Signal, Behavior[IotSupervisor.Command]] = {
+  override def onSignal: PartialFunction[Signal, Behavior[TwinSupervisor.Command]] = {
     case PostStop =>
-      context.log.info("IoT Application stopped")
+      context.log.info("Twin Microservice stopped")
       this
   }
 }
 
 import akka.actor.typed.ActorSystem
 
-object IotApp {
+object TwinApp {
 
   def main(args: Array[String]): Unit = {
     val httpPort = 8080
-    ActorSystem[IotSupervisor.Command](IotSupervisor(httpPort), "twin")
+    ActorSystem[TwinSupervisor.Command](TwinSupervisor(httpPort), "twin")
   }
 }

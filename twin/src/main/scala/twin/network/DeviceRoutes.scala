@@ -1,33 +1,31 @@
 package twin.network 
 
+import akka.actor.typed.ActorRef
 import akka.actor.typed.ActorSystem
+
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.Directives._
+
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.ContentTypes
-import akka.actor.typed.ActorRef
-
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import spray.json.DefaultJsonProtocol._
-import scala.concurrent.Future
-import akka.Done
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ContentTypes
-import scala.util.Success
-import scala.util.Failure
-
-//import scala.util.parsing.json._
-import spray.json._
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers._
 
-import akka.http.scaladsl.server.Directives._
+import spray.json._
+import spray.json.DefaultJsonProtocol._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+
+import scala.concurrent.Future
+import scala.util.Success
+import scala.util.Failure
+
 import twin._
 
 private[twin] final class DeviceRoutes(
     system: ActorSystem[_],
-    //networkActor: ActorRef[NetworkActor.Command],
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
-    //deviceManager: ActorRef[DeviceManager.Command] // TODO array of deviceManagers that serve requests in round robin manner?
 ) {
 
   final case class StopDevice(deviceId: String, groupId: String)
@@ -179,8 +177,7 @@ private[twin] final class DeviceRoutes(
             } {
                 case Success(respondData) => complete(HttpEntity(ContentTypes.`application/json`, respondData))
                 case Failure(exception)  => complete(StatusCodes.InternalServerError,s"An error occurred: ${exception.getMessage}")
-            }
-                 
+            }     
           }
         }
       },
