@@ -105,7 +105,7 @@ object HttpServerFrontend {
 
     val readsideHost = system.settings.config.getConfig("readside").getString("host")
     val readsidePort = system.settings.config.getConfig("readside").getString("port")
-    val routeToReadside = "http://" + readsideHost + ":" + readsidePort 
+    val routeToReadside = "http://" + readsideHost + ":" + readsidePort  + "/twin-readside"
 
     val twinHost = system.settings.config.getConfig("twin").getString("host")
     val twinPort = system.settings.config.getConfig("twin").getString("port")
@@ -113,7 +113,7 @@ object HttpServerFrontend {
 
     val simulatorHost = system.settings.config.getConfig("simulator").getString("host")
     val simulatorPort = system.settings.config.getConfig("simulator").getString("port")
-    val routeToSimulator = "http://" + simulatorHost + ":" + simulatorPort
+    val routeToSimulator = "http://" + simulatorHost + ":" + simulatorPort + "/simulator"
 
     implicit val executionContext: ExecutionContext = system.executionContext
 
@@ -151,7 +151,8 @@ object HttpServerFrontend {
       path("vpp" / Segment / "energies" / "delete" ) { vppId  => 
         post {
           entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest => 
-            sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/deleteEnergyDeposits",HttpMethods.POST)
+            sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/energies",HttpMethods.DELETE)
+            //sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/deleteEnergyDeposits",HttpMethods.POST)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Energies requested for delete before "+deleteEnergyDepositsRequest.before.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))))
           }
         }
@@ -168,7 +169,7 @@ object HttpServerFrontend {
                 dates match {
                   case Failure(exception) => throw new Exception(exception)
                   case Success((before,after)) => {
-                    sendHttpRequest(EnergyDepositedRequest(vppId,before,after).toJson,routeToReadside+"/energyDeposits",HttpMethods.GET)
+                    sendHttpRequest(EnergyDepositedRequest(vppId,before,after).toJson,routeToReadside+"/energies",HttpMethods.GET)
                   }
                 }
               }{

@@ -1,4 +1,4 @@
-package com.example
+package twinreadside
 
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
@@ -13,8 +13,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.StdIn
 import akka.http.javadsl.model.StatusCode
-import com.example.repository.ScalikeJdbcSession
-import com.example.repository.DeviceTemperatureRepositoryImpl
+import twinreadside.repository.ScalikeJdbcSession
+import twinreadside.repository.DeviceEnergyDepositsRepositoryImpl
 import scala.util.Success
 
 import akka.{Done, actor => classic}
@@ -22,7 +22,7 @@ import akka.http.scaladsl.Http
 import akka.actor.CoordinatedShutdown
 import scala.util.Failure
 import scalikejdbc.config.DBs
-import com.example.repository.ScalikeJdbcSetup
+import twinreadside.repository.ScalikeJdbcSetup
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.ContentTypes
 
@@ -40,12 +40,16 @@ import spray.json._
 import java.time.format.DateTimeFormatter
 import java.time.LocalDateTime
 
-object HttpServerWithActorInteraction {
+/**
+  * a http server for the twin readside Microservice
+  */
+object TwinReadsideHttpServer{
   
-
-
+  /**
+    * conversion of LocalDateTimes to JSON and vice versa
+    */
   implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
-    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss") //DateTimeFormatter.ISO_DATE_TIME
+    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     def write(x: LocalDateTime) = JsString(formatter.format(x))
     def read(value: JsValue) = value match {
       case JsString(x) => LocalDateTime.parse(x, formatter)
@@ -61,7 +65,7 @@ object HttpServerWithActorInteraction {
   final case class EnergyDepositedResult(energyDeposited : Option[Double])
   implicit val energyDepositedResultFormat = jsonFormat1(EnergyDepositedResult)
 
-  final case class DeviceAndTemperature(deviceId: String, temperature: Double)
+  /*final case class DeviceAndTemperature(deviceId: String, temperature: Double)
   final case class DevicesAndTemperatures(devicesAndTemperatures: List[DeviceAndTemperature])
 
   final case class RecordTemperature(groupId: String,deviceId: String,value: Double)
@@ -76,7 +80,7 @@ object HttpServerWithActorInteraction {
   implicit val deviceAndTemperatureFormat = jsonFormat2(DeviceAndTemperature)
   implicit val devicesAndTemperaturesFormat = jsonFormat1(DevicesAndTemperatures)
 
-  implicit val recordTemperature = jsonFormat3(RecordTemperature)
+  implicit val recordTemperature = jsonFormat3(RecordTemperature) */
 
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[_] =
@@ -85,61 +89,31 @@ object HttpServerWithActorInteraction {
     // needed for the future flatMap/onComplete at the end
     implicit val executionContext: ExecutionContext = system.executionContext
 
-    ScalikeJdbcSetup.init(system) // setup database
-    val deviceTemperatureRepository = new DeviceTemperatureRepositoryImpl()
+    // setup database
+    ScalikeJdbcSetup.init(system) 
+    val deviceEnergyDepositsRepository = new DeviceEnergyDepositsRepositoryImpl()
 
     val route = concat(
-      path("devicesAndTemperatures") {
-        get {
-        //access database
-        val session = new ScalikeJdbcSession() // TODO HERE OR ONCE?
-        
-        val allTemperatures =
-          deviceTemperatureRepository.getAllDevicesAndTemperatures(session)
-        session.close()
-        //output json
-        val devicesAndTemperatures =
-          DevicesAndTemperatures(allTemperatures.map {
-            case (deviceId, temperature) =>
-              DeviceAndTemperature(deviceId, temperature)
-          })
-        complete(devicesAndTemperatures)
-        }
-      },
-      path("delete" ) { // deletes in backend readside- database
-        post {
-          entity(as[StartSimulation]) { startSimulation =>
-            val fullDeviceName = "Device|"+startSimulation.groupId+"&&&"+startSimulation.deviceId
-            val session = new ScalikeJdbcSession()
-            deviceTemperatureRepository.delete(session,fullDeviceName)
-            session.close()
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+fullDeviceName+ " requested for delete in read-side db."))
+      path("twin-readside" / "energies") {
+        concat(
+          get {
+            entity(as[EnergyDepositedRequest]) { energyDepositRequest => 
+              val session = new ScalikeJdbcSession() // TODO HERE OR ONCE?
+              val pastAsDateTime = energyDepositRequest.after
+              val energyDepositSum = deviceEnergyDepositsRepository.queryEnergyDeposits(session,energyDepositRequest.vppId,energyDepositRequest.before,energyDepositRequest.after) 
+              session.close()
+              complete(EnergyDepositedResult(energyDepositSum))
+            }
+          },
+          delete {
+            entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest =>
+              val session = new ScalikeJdbcSession()
+              deviceEnergyDepositsRepository.deleteEnergyDeposits(session,deleteEnergyDepositsRequest.before)
+              session.close()
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Energies requested for delete before "+deleteEnergyDepositsRequest.before.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))))
+            }
           }
-        }
-      },
-      path("deleteEnergyDeposits" ) { // deletes in backend readside- database
-        post {
-          entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest =>
-            println("ENERGYDEPOSITDELETE!!!")
-            //val fullDeviceName = "Device|"+startSimulation.groupId+"&&&"+startSimulation.deviceId
-            val session = new ScalikeJdbcSession()
-            deviceTemperatureRepository.deleteEnergyDeposits(session,deleteEnergyDepositsRequest.before)
-            session.close()
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Energies requested for delete before "+deleteEnergyDepositsRequest.before.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))))
-          }
-        }
-      },
-      path("energyDeposits") {
-        println("GET energies")
-        get {
-          entity(as[EnergyDepositedRequest]) { energyDepositRequest => 
-            val session = new ScalikeJdbcSession() // TODO HERE OR ONCE?
-            val pastAsDateTime = energyDepositRequest.after//LocalDateTime.parse(energyDepositRequest.after,DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            val energyDepositSum = deviceTemperatureRepository.queryEnergyDeposits(session,energyDepositRequest.vppId,energyDepositRequest.before,energyDepositRequest.after) 
-            session.close()
-            complete(EnergyDepositedResult(energyDepositSum))
-          }
-        }
+        )
       }
     )
 

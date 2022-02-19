@@ -1,4 +1,4 @@
-package com.example
+package simulator.network
 
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
@@ -33,67 +33,114 @@ import akka.http.scaladsl.model.HttpResponse
 
 import spray.json._
 
-object HttpServerWithActorInteraction {
-  sealed trait HttpMessage
-  final case class StartSimulation(deviceId: String, groupId: String) extends HttpMessage
-  final case class StopSimulation(deviceId: String, groupId: String)  extends HttpMessage
+import simulator._
 
-  object MainActor {
+/**
+  * HttpServer for the simulator Microservice
+  */
+object SimulatorHttpServer {
+
+  /**
+    * used to parse the body of HttpRequests to the simulator Microservice
+    *
+    * @param deviceId
+    * @param groupId
+    */
+  final case class DeviceIdentifier(deviceId: String, groupId: String) 
+  implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
+
+  /**
+    * the user guardian of the simulator application
+    */
+  object SimulatorGuardian {
+
+    /**
+      * messages that the user guardian can process
+      */
     sealed trait Command
+
+    /**
+      * this message requests to start the simulation of the specified hardware
+      *
+      * @param deviceId
+      * @param groupId
+      * @param routeToPostData
+      * @param routeToPostStart
+      * @param routeToPostStop
+      */
     final case class StartSimulation(
         deviceId: String,
         groupId: String,
-        routeToPostTemperature: String,
+        routeToPostData: String,
         routeToPostStart: String,
         routeToPostStop: String,
     ) extends Command
+
+    /**
+      * * this message requests to stop the simulation of the specified hardware
+      *
+      * @param deviceId
+      * @param groupId
+      * @param routeToPostData
+      */
     final case class StopSimulation(
         deviceId: String,
         groupId: String,
-        routeToPostTemperature: String
+        routeToPostData: String
     ) extends Command
+
+    /**
+      * this message is sent to the guardian in order to confirm that a hardware has been stopped
+      *
+      * @param deviceId
+      * @param groupId
+      */
+    final case class ConfirmStop(deviceId : String, groupId : String) extends Command
 
     def apply(): Behaviors.Receive[Command] = getNewBehavior(Map.empty)
 
-    def getNewBehavior(
-        uniqueDeviceId2ActorRef: Map[String, ActorRef[DeviceSimulator.Command]]
-    ): Behaviors.Receive[Command] =
+    /**
+      * 
+      *
+      * @param uniqueDeviceId2ActorRef a collection to all DeviceSimulators run by this application
+      * @return
+      */
+    def getNewBehavior(uniqueDeviceId2ActorRef: Map[String, ActorRef[DeviceSimulator.Command]]): Behaviors.Receive[Command] =
       Behaviors.receive { (context, message) =>
         message match {
-          case StartSimulation(deviceId, groupId, routeToPostTemperature,routeToPostStart,routeToPostStop) =>
+          case StartSimulation(deviceId, groupId, routeToPostData,routeToPostStart,routeToPostStop) =>
             val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
             uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
               case Some(deviceSimulator) => Behaviors.same
               case None =>
-                val deviceSimulator = context.spawn(
-                  DeviceSimulator(deviceId, groupId,100, routeToPostTemperature,routeToPostStart,routeToPostStop),
-                  uniqueDeviceId
-                )
+                val deviceSimulator = context.spawn(DeviceSimulator(deviceId, groupId,100, routeToPostData,routeToPostStart,routeToPostStop),uniqueDeviceId)
                 val newUniqueDeviceId2ActorRef =
                   uniqueDeviceId2ActorRef + (uniqueDeviceId -> deviceSimulator)
                 deviceSimulator ! DeviceSimulator.StartSimulation
                 getNewBehavior(newUniqueDeviceId2ActorRef)
             }
-          case StopSimulation(deviceId, groupId, routeToPostTemperature) =>
+          case StopSimulation(deviceId, groupId, routeToPostData) =>
             val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
             uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
               case Some(deviceSimulator) =>
-                deviceSimulator ! DeviceSimulator.StopSimulation
-                val newUniqueDeviceId2ActorRef = uniqueDeviceId2ActorRef - uniqueDeviceId
-                getNewBehavior(newUniqueDeviceId2ActorRef)
+                deviceSimulator ! DeviceSimulator.StopSimulation(context.self)
+                Behaviors.same
               case None => Behaviors.same
             }
+          case ConfirmStop(dId, gId) => 
+              val uniqueDeviceId = DeviceSimulator.makeEntityId(gId, dId)
+              val newUniqueDeviceId2ActorRef = uniqueDeviceId2ActorRef - uniqueDeviceId
+              getNewBehavior(newUniqueDeviceId2ActorRef)
           case _ => Behaviors.unhandled
         }
       }
   }
 
-  implicit val startSimulation = jsonFormat2(StartSimulation)
-  implicit val stopSimulation  = jsonFormat2(StopSimulation)
+  
 
   def main(args: Array[String]): Unit = {
-    implicit val system: ActorSystem[MainActor.Command] =
-      ActorSystem(MainActor(), "simulator")
+    implicit val system: ActorSystem[SimulatorGuardian.Command] =
+      ActorSystem(SimulatorGuardian(), "simulator")
 
     val twinConfig             = system.settings.config.getConfig("twin")
     val host                   = twinConfig.getString("host")
@@ -102,15 +149,12 @@ object HttpServerWithActorInteraction {
     val routeToPostStop = "http://" + host + ":" + port + "/twin" + "/untrack-device"
     val routeToPostStart = "http://" + host + ":" + port + "/twin"  + "/track-device"
 
-    //val minikubeConfig = system.settings.config.getConfig("minikube")
-    //val minikubeIp = minikubeConfig.getString("ip")
-
     val route = concat(
-      path("start") {
-        entity(as[StartSimulation]) { startSimulation =>
-          system ! MainActor.StartSimulation(
-            startSimulation.deviceId,
-            startSimulation.groupId,
+      path("simulator" / "start") {
+        entity(as[DeviceIdentifier]) { deviceIdentifier =>
+          system ! SimulatorGuardian.StartSimulation(
+            deviceIdentifier.deviceId,
+            deviceIdentifier.groupId,
             routeToPostData,
             routeToPostStart,
             routeToPostStop,
@@ -118,11 +162,11 @@ object HttpServerWithActorInteraction {
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Start request received."))
         }
       },
-      path("stop") {
-        entity(as[StopSimulation]) { stopSimulation =>
-          system ! MainActor.StopSimulation(
-            stopSimulation.deviceId,
-            stopSimulation.groupId,
+      path("simulator" / "stop") {
+        entity(as[DeviceIdentifier]) { deviceIdentifier =>
+          system ! SimulatorGuardian.StopSimulation(
+            deviceIdentifier.deviceId,
+            deviceIdentifier.groupId,
             routeToPostData
           )
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Stop request received."))

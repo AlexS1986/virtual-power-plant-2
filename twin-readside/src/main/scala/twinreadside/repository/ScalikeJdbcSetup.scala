@@ -1,4 +1,4 @@
-package com.example.repository
+package twinreadside.repository
 
 import akka.actor.typed.ActorSystem
 import com.typesafe.config.Config

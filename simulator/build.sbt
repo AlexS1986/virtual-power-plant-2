@@ -37,7 +37,8 @@ dockerUpdateLatest := true
 dockerUsername := sys.props.get("docker.username")
 dockerRepository := sys.props.get("docker.registry")
 dockerBaseImage := "adoptopenjdk:11-jre-hotspot"
-// make version compativle with docker for publishing
+
+// make version compatable with docker for publishing
 ThisBuild / dynverSeparator := "-"
 
 scalacOptions := Seq("-feature", "-unchecked", "-deprecation", "-encoding", "utf8")
@@ -45,11 +46,8 @@ classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.AllLibraryJars
 fork in run := true
 Compile / run / fork := true
 
-Compile / mainClass := Some("com.example.HttpServerWithActorInteraction") // tell compiler the main class
+Compile / mainClass := Some("simulator.network.SimulatorHttpServer") // tell compiler the main class
 
 enablePlugins(JavaServerAppPackaging, DockerPlugin) // enable docker plugin for deployment in k8s
 
 
-//twirl
-
-//sourceDirectories in (Compile, TwirlKeys.compileTemplates) := (unmanagedSourceDirectories in Compile).value

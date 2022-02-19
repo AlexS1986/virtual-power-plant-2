@@ -1,4 +1,4 @@
-package com.example.repository // TODO
+package twinreadside.repository 
 
 import akka.japi.function.Function
 import akka.projection.jdbc.JdbcSession

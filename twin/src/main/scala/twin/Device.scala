@@ -337,7 +337,7 @@ object Device {
           val simulatorConfig = system.settings.config.getConfig("simulator")
           val host = simulatorConfig.getString("host")
           val port = simulatorConfig.getString("port")
-          val routeToSimulator = "http://" + host + ":" + port + "/stop"
+          val routeToSimulator = "http://" + host + ":" + port + "/simulator" + "/stop"
           sendJsonViaHttp(stopSimulation.toJson, routeToSimulator,HttpMethods.POST)
       }
     }
