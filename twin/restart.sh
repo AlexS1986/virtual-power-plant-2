@@ -20,7 +20,7 @@ echo $http_port
 echo $(curl -XGET http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 
 #test
-echo $(curl -XPOST http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2", "capacity" : 100, "chargeStatus" : 80, "deliveredEnergy" : 0}')
+echo $(curl -XPOST http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2", "capacity" : 100, "chargeStatus" : 80, "deliveredEnergy" : 0, "deliveredEnergyDate":"2022-02-22 16:02:15"}')
 
 echo $(curl -v -XGET http://192.168.49.2:$http_port/twin/data -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 

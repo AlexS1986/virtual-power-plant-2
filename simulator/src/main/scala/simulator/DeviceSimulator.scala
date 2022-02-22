@@ -19,6 +19,9 @@ import scala.util.Failure
 import scala.util.Success
 import akka.actor.typed.ActorRef
 
+import java.time.format.DateTimeFormatter
+import java.time.LocalDateTime
+
 /**
   * actors of this type simulate hardware
   */
@@ -66,9 +69,22 @@ object DeviceSimulator {
       deviceId: String,
       capacity: Double,
       chargeStatus: Double,
-      deliveredEnergy: Double
+      deliveredEnergy: Double,
+      deliveredEnergyDate: LocalDateTime
   )
-  implicit val recordDataFormat = jsonFormat5(RecordData)
+
+  implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
+    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    def write(x: LocalDateTime) = JsString(formatter.format(x))
+    def read(value: JsValue) = value match {
+      case JsString(x) => LocalDateTime.parse(x, formatter)
+      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
+    }
+  }
+
+  implicit val recordDataFormat = jsonFormat6(RecordData)
+
+  
 
   /**
     * this message encodes a device identifier that uses a groupId and a deviceId to uniquely identify a hardware device
@@ -189,12 +205,12 @@ object DeviceSimulator {
       urlToPostData: String,
       parameters: String
   )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration) = {
-    val recordTemperature =
+    val recordData =
       if (parameters == "even")
-        RecordData(groupId, deviceId, 100.0,chargeStatus = 20, deliveredEnergy = 10)
+        RecordData(groupId, deviceId, 100.0,chargeStatus = 20, deliveredEnergy = 10, LocalDateTime.now())
       else
-        RecordData(groupId, deviceId, 100,chargeStatus = 40, deliveredEnergy = -9)
-    sendJsonViaHttp(recordTemperature.toJson,urlToPostData,HttpMethods.POST)
+        RecordData(groupId, deviceId, 100,chargeStatus = 40, deliveredEnergy = -9, LocalDateTime.now())
+    sendJsonViaHttp(recordData.toJson,urlToPostData,HttpMethods.POST)
     val nextParamters = if (parameters == "even") "odd" else "even"
     (RunSimulation(nextParamters), 2.seconds)
   }

@@ -66,6 +66,7 @@ object DeviceManager {
       capacity: Double,
       chargeStatus: Double,
       deliveredEnergy: Double,
+      deliveredEnergyDate: LocalDateTime,
   ) extends Command
 
   /**
@@ -121,9 +122,9 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.RequestData(deviceId, replyTo)
         this
-      case RecordData(groupId, deviceId, capacity, chargeStatus, deliveredEnergy) => 
+      case RecordData(groupId, deviceId, capacity, chargeStatus, deliveredEnergy,deliveredEnergyDate) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, LocalDateTime.now())
+        group ! DeviceGroup.RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, deliveredEnergyDate)
         this
       case RequestAllData(groupId,replyTo) =>
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)

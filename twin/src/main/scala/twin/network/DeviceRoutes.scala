@@ -23,6 +23,9 @@ import scala.util.Failure
 
 import twin._
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 private[twin] final class DeviceRoutes(
     system: ActorSystem[_],
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
@@ -34,8 +37,16 @@ private[twin] final class DeviceRoutes(
   final case class DeviceIdentifier(deviceId: String, groupId: String)
   implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
 
-  final case class RecordData(groupId: String, deviceId: String, capacity: Double, chargeStatus: Double, deliveredEnergy: Double)
-  implicit val recordDataFormat = jsonFormat5(RecordData)
+  final case class RecordData(groupId: String, deviceId: String, capacity: Double, chargeStatus: Double, deliveredEnergy: Double, deliveredEnergyDate: LocalDateTime)
+  implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
+    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    def write(x: LocalDateTime) = JsString(formatter.format(x))
+    def read(value: JsValue) = value match {
+      case JsString(x) => LocalDateTime.parse(x, formatter)
+      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
+    }
+  }
+  implicit val recordDataFormat = jsonFormat6(RecordData)
 
   final case class GroupIdentifier(groupId: String)
   implicit val groupIdentifierFormat = jsonFormat1(GroupIdentifier)
@@ -145,6 +156,7 @@ private[twin] final class DeviceRoutes(
                       recordDataRequest.capacity,
                       recordDataRequest.chargeStatus,
                       recordDataRequest.deliveredEnergy,
+                      recordDataRequest.deliveredEnergyDate
                     )
                     complete(StatusCodes.Accepted)
                 case None => complete(StatusCodes.InternalServerError)
