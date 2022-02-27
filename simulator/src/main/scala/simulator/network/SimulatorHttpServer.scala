@@ -113,7 +113,7 @@ object SimulatorHttpServer {
             uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
               case Some(deviceSimulator) => Behaviors.same
               case None =>
-                val deviceSimulator = context.spawn(DeviceSimulator(deviceId, groupId,100, routeToPostData,routeToPostStart,routeToPostStop),uniqueDeviceId)
+                val deviceSimulator = context.spawn(DeviceSimulator(deviceId, groupId,100, 0.5, routeToPostData,routeToPostStart,routeToPostStop),uniqueDeviceId)
                 val newUniqueDeviceId2ActorRef =
                   uniqueDeviceId2ActorRef + (uniqueDeviceId -> deviceSimulator)
                 deviceSimulator ! DeviceSimulator.StartSimulation

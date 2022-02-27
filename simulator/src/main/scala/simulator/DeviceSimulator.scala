@@ -53,7 +53,7 @@ object DeviceSimulator {
     *
     * @param parameters
     */
-  private[DeviceSimulator] final case class RunSimulation(parameters: String) extends Command
+  private[DeviceSimulator] final case class RunSimulation(parameters: String, newChargeStatus : Double) extends Command
 
   /**
     * this message is sent by this actor to its twin in order to record its current state etc.
@@ -111,11 +111,12 @@ object DeviceSimulator {
       deviceId: String,
       groupId: String,
       capacity: Double,
+      initialChargeStatus: Double,
       urlToPostData: String,
       urlToRequestTracking: String,
       urlToRequestStopTracking: String,
   ): Behavior[Command] = {
-    getNewBehavior(groupId, deviceId, capacity, 0, urlToPostData, urlToRequestTracking,urlToRequestStopTracking, false)
+    getNewBehavior(groupId, deviceId, capacity, initialChargeStatus, urlToPostData, urlToRequestTracking,urlToRequestStopTracking, false)
   }
 
   /**
@@ -124,7 +125,7 @@ object DeviceSimulator {
     * @param groupId
     * @param deviceId
     * @param capacity
-    * @param chargeStatus the current chargeStatus of this hardware
+    * @param chargeStatus the current chargeStatus of this hardware in range 0 (empty device) to 1 (full capacity used)
     * @param routeToPostTemperature
     * @param urlToRequestTracking
     * @param urlToRequestUnTracking
@@ -147,7 +148,7 @@ object DeviceSimulator {
         case StartSimulation => 
           sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST)
           if (!simulationRunning) {
-            context.self ! RunSimulation("even")
+            context.self ! RunSimulation("even",newChargeStatus = chargeStatus)
             getNewBehavior(
               groupId,
               deviceId,
@@ -175,13 +176,15 @@ object DeviceSimulator {
             }
           }
         }
-        case RunSimulation(parameters) => {
+        case RunSimulation(parameters, newChargeStatus) => {
           val (message, delay) =
             simulateDevice(
               groupId,
               deviceId,
               routeToPostTemperature,
-              parameters
+              parameters,
+              capacity,
+              newChargeStatus,
             )
           context.scheduleOnce(delay, context.self, message)
           Behaviors.same
@@ -203,16 +206,78 @@ object DeviceSimulator {
       groupId: String,
       deviceId: String,
       urlToPostData: String,
-      parameters: String
+      parameters: String,
+      capacity: Double,
+      chargeStatus: Double
   )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration) = {
-    val recordData =
-      if (parameters == "even")
-        RecordData(groupId, deviceId, 100.0,chargeStatus = 20, deliveredEnergy = 10, LocalDateTime.now())
-      else
-        RecordData(groupId, deviceId, 100,chargeStatus = 40, deliveredEnergy = -9, LocalDateTime.now())
+
+    assert( chargeStatus>= 0.0 && chargeStatus <= 1.0, "ChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + chargeStatus)
+    
+    // this is the desired charge status that this device should reach and can be controlled externally
+    val desiredChargeStatus = 1.0
+    val desiredEnergyStoredInHardware  = (desiredChargeStatus - chargeStatus) * capacity
+
+
+    val now = LocalDateTime.now()
+    val secondsOfDay = now.toLocalTime().toSecondOfDay()
+  
+    // local energy production has a random and a periodic part that simulates renewable energy production
+    val maxAmplRandom = 0.025 * capacity
+    val signRandom = if(math.random()>0.5) 1.0 else -1.0
+    val random = math.random()*maxAmplRandom*signRandom
+   
+    val amplitudeOfLocalEnergyProduction = maxAmplRandom
+    val periodicLocalEnergyProduction = amplitudeOfLocalEnergyProduction * (-1.0) * math.cos(secondsOfDay.toDouble/86400.0 * 2.0 * math.Pi)
+    
+    val localEnergyProduction =  periodicLocalEnergyProduction + random
+    
+    // Charging and uncharging are limited by technical constraints
+
+    // how fast device can be charged
+    val technicalChargeLimit = 0.1 * capacity 
+
+    // how fast device can be uncharged
+    val technicalUnChargeLimit = 2.0 * technicalChargeLimit
+
+    // how much capacity is left
+    val availableEnergyStorage = capacity - chargeStatus * capacity
+
+    // amount of energy that could be potentially stored in hardware as limited by technical contraints
+    val upperLimitEnergyStoredInHardware = math.min(technicalChargeLimit,availableEnergyStorage)
+
+    // amount of energy that can be discharged as limited by technical contraints
+    val lowerLimitEnergyStoredInHardware = math.max(-technicalUnChargeLimit, -chargeStatus * capacity)
+
+    // the amount of energy stored in the hardware that best matches the desired charge status and technical constraints
+    val energyStoredInLocalHardware = math.max(lowerLimitEnergyStoredInHardware,math.min(desiredEnergyStoredInHardware,upperLimitEnergyStoredInHardware))
+
+    // energy produced locally in excess of what is stored in hardware is emitted to grid (positive sign).
+    // energy stored in excess of local production is consumed from grid (negative sign)
+    val energyDeposit = localEnergyProduction - energyStoredInLocalHardware
+
+    // the new chargeStatus
+    val newChargeStatus = (chargeStatus*capacity+energyStoredInLocalHardware)/capacity
+
+    println("secondsOfDay: " + secondsOfDay)
+    println("randomPart " + random)
+    println("periodicLocalEnergyProduction " + periodicLocalEnergyProduction)
+    println("localEnergyProduction: " + localEnergyProduction)
+    println("energyStoredInLocalHardware: " + energyStoredInLocalHardware)
+    println("energyDeposit: " + energyDeposit)
+    println("newChargeStatus: " + newChargeStatus)
+
+    /**
+      * report activities and status to twin
+      */
+    val recordData = RecordData(groupId, deviceId, capacity , chargeStatus = newChargeStatus, deliveredEnergy = energyDeposit, now)
     sendJsonViaHttp(recordData.toJson,urlToPostData,HttpMethods.POST)
+
+    /**
+      * compute a message for self that drives the simulation forward
+      */
     val nextParamters = if (parameters == "even") "odd" else "even"
-    (RunSimulation(nextParamters), 2.seconds)
+    val delayNextMessage = 2.seconds
+    (RunSimulation(nextParamters, newChargeStatus), delayNextMessage)
   }
 
   /**

@@ -218,7 +218,7 @@ class VPPOverview {
                 
                 //myDiv.innerHTML = deviceSimulatorToRender.temperature
                 const batteryWidget = new BatteryWidget(divChargeStatus)
-                batteryWidget.setBatteryValue(deviceSimulatorToRender.temperature*2)
+                batteryWidget.setBatteryValue(deviceSimulatorToRender.temperature*100)
                 //divChargeStatus.appendChild(document.createTextNode(deviceSimulatorToRender.temperature))
                 tdChargeStatus.appendChild(divChargeStatus)
                 tr.appendChild(tdChargeStatus)
