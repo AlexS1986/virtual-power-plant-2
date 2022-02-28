@@ -28,5 +28,6 @@ echo $(curl -v -XGET http://192.168.49.2:$http_port/twin/data -H "Content-Type: 
 echo $(curl -v -XPOST http://192.168.49.2:$http_port/twin/track-device -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')
 echo $(curl -v -XGET http://192.168.49.2:$http_port/twin/data-all -H "Content-Type: application/json" --data '{"groupId":"group2"}')
 
+#echo $(curl -XPOST http://192.168.49.2:$http_port/twin/charge-status -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "device1", "desiredChargeStatus" : 1.0}')
 
 #echo $(curl -XGET http://10.111.136.207:30080/temperature -H "Content-Type: application/json" --data '{"groupId":"group2","deviceId": "device2"}')

@@ -81,6 +81,8 @@ object DeviceGroup {
     */
   final case class StopDevice(deviceId: String) extends Command
 
+  final case class SetDesiredChargeStatus(deviceId: String, desiredChargeStatus: Double) extends Command
+
   /**
     * a message that requests to report the Data for a Device 
     *
@@ -237,6 +239,11 @@ object DeviceGroup {
                 case StopDevice(deviceId) => if(devicesRegistered.contains(deviceId)) {
                     val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
                     device ! Device.StopDevice
+                  }
+                  Effect.none
+                case SetDesiredChargeStatus(deviceId, desiredChargeStatus) => if(devicesRegistered.contains(deviceId)) {
+                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                    device ! Device.SetDesiredChargeStatus(desiredChargeStatus)
                   }
                   Effect.none
                 case RequestData(deviceId,replyTo) => if(devicesRegistered.contains(deviceId)) {

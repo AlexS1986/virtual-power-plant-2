@@ -35,12 +35,19 @@ object DeviceSimulator {
   /**
     * this message is sent to this actor in order to start the simulation of hardware
     */
-  final case object StartSimulation                        extends Command
+  final case object StartSimulation extends Command
+
+  /**
+    * this message is sent to this actor in order to communicate a desired charge status for this hardware
+    *
+    * @param desiredChargeStatus
+    */
+  final case class SetDesiredChargeStatus(desiredChargeStatus: Double) extends Command
 
   /**
     * this message is sent to this actor in order to stop the simulation of hardware
     */
-  final case class StopSimulation(replyTo : ActorRef[simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop]) extends Command
+  final case class StopSimulation(replyTo: ActorRef[simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop]) extends Command
 
 
   /**
@@ -53,7 +60,7 @@ object DeviceSimulator {
     *
     * @param parameters
     */
-  private[DeviceSimulator] final case class RunSimulation(parameters: String, newChargeStatus : Double) extends Command
+  private[DeviceSimulator] final case class RunSimulation(parameters: String) extends Command
 
   /**
     * this message is sent by this actor to its twin in order to record its current state etc.
@@ -81,10 +88,7 @@ object DeviceSimulator {
       case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
     }
   }
-
   implicit val recordDataFormat = jsonFormat6(RecordData)
-
-  
 
   /**
     * this message encodes a device identifier that uses a groupId and a deviceId to uniquely identify a hardware device
@@ -116,7 +120,7 @@ object DeviceSimulator {
       urlToRequestTracking: String,
       urlToRequestStopTracking: String,
   ): Behavior[Command] = {
-    getNewBehavior(groupId, deviceId, capacity, initialChargeStatus, urlToPostData, urlToRequestTracking,urlToRequestStopTracking, false)
+    getNewBehavior(groupId, deviceId, capacity, initialChargeStatus, initialChargeStatus, urlToPostData, urlToRequestTracking,urlToRequestStopTracking, false)
   }
 
   /**
@@ -136,7 +140,8 @@ object DeviceSimulator {
       groupId: String,
       deviceId: String,
       capacity: Double,
-      chargeStatus: Double, 
+      chargeStatus: Double,
+      desiredChargeStatus: Double, 
       routeToPostTemperature: String,
       urlToRequestTracking: String,
       urlToRequestUnTracking: String,
@@ -148,12 +153,13 @@ object DeviceSimulator {
         case StartSimulation => 
           sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST)
           if (!simulationRunning) {
-            context.self ! RunSimulation("even",newChargeStatus = chargeStatus)
+            context.self ! RunSimulation("even")
             getNewBehavior(
               groupId,
               deviceId,
               capacity,
               chargeStatus,
+              desiredChargeStatus = chargeStatus,
               routeToPostTemperature,
               urlToRequestTracking,
               urlToRequestUnTracking,
@@ -167,6 +173,18 @@ object DeviceSimulator {
           context.scheduleOnce(10.seconds, context.self,UntrackDeviceAtTwin) 
           replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId)
           Behaviors.same
+        case SetDesiredChargeStatus(desiredChargeStatus) => 
+          getNewBehavior(
+              groupId,
+              deviceId,
+              capacity,
+              chargeStatus,
+              desiredChargeStatus,
+              routeToPostTemperature,
+              urlToRequestTracking,
+              urlToRequestUnTracking,
+              true
+            )
         case UntrackDeviceAtTwin => 
           Behaviors.stopped{ () => { 
             implicit val executionContext = system.executionContext
@@ -176,18 +194,30 @@ object DeviceSimulator {
             }
           }
         }
-        case RunSimulation(parameters, newChargeStatus) => {
-          val (message, delay) =
+        case RunSimulation(parameters) => {
+          val (message, delay, newChargeStatus) =
             simulateDevice(
               groupId,
               deviceId,
               routeToPostTemperature,
               parameters,
               capacity,
-              newChargeStatus,
+              chargeStatus,
+              desiredChargeStatus,
             )
           context.scheduleOnce(delay, context.self, message)
-          Behaviors.same
+          getNewBehavior(
+              groupId,
+              deviceId,
+              capacity,
+              newChargeStatus,
+              desiredChargeStatus,
+              routeToPostTemperature,
+              urlToRequestTracking,
+              urlToRequestUnTracking,
+              true
+            )
+          //Behaviors.same
         }
       }
     }
@@ -208,13 +238,14 @@ object DeviceSimulator {
       urlToPostData: String,
       parameters: String,
       capacity: Double,
-      chargeStatus: Double
-  )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration) = {
+      chargeStatus: Double,
+      desiredChargeStatus: Double,
+  )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration, Double) = {
 
     assert( chargeStatus>= 0.0 && chargeStatus <= 1.0, "ChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + chargeStatus)
-    
+     assert( desiredChargeStatus>= 0.0 && desiredChargeStatus <= 1.0, "DesiredChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + desiredChargeStatus)
     // this is the desired charge status that this device should reach and can be controlled externally
-    val desiredChargeStatus = 1.0
+    //val desiredChargeStatus = 1.0
     val desiredEnergyStoredInHardware  = (desiredChargeStatus - chargeStatus) * capacity
 
 
@@ -277,7 +308,7 @@ object DeviceSimulator {
       */
     val nextParamters = if (parameters == "even") "odd" else "even"
     val delayNextMessage = 2.seconds
-    (RunSimulation(nextParamters, newChargeStatus), delayNextMessage)
+    (RunSimulation(nextParamters), delayNextMessage, newChargeStatus)
   }
 
   /**

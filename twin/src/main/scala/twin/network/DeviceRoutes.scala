@@ -34,6 +34,17 @@ private[twin] final class DeviceRoutes(
   final case class StopDevice(deviceId: String, groupId: String)
   implicit val stopDeviceFormat  = jsonFormat2(StopDevice)
 
+
+  /**
+      * this message is sent to this Microservice in order tell a particular Device to set its desired charge status
+      *
+      * @param deviceId
+      * @param groupId
+      * @param desiredChargeStatus
+      */
+  final case class DesiredChargeStatusMessage(deviceId: String, groupId: String, desiredChargeStatus: Double) 
+  implicit val desiredChargeStatusMessageFormat = jsonFormat3(DesiredChargeStatusMessage)
+
   final case class DeviceIdentifier(deviceId: String, groupId: String)
   implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
 
@@ -103,6 +114,18 @@ private[twin] final class DeviceRoutes(
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager ! DeviceManager.RequestUnTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId)
                                             complete(StatusCodes.Accepted, "Device untrack request received")
+                case None => complete(StatusCodes.InternalServerError)
+              } 
+          }
+        }
+      },
+      path("twin" / "charge-status") {
+        post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
+          entity(as[DesiredChargeStatusMessage]) { 
+            desiredChargeStatusMessage =>
+              getDeviceManager match {
+                case Some(deviceManager) => deviceManager ! DeviceManager.SetDesiredChargeStatus(desiredChargeStatusMessage.deviceId,desiredChargeStatusMessage.groupId,desiredChargeStatusMessage.desiredChargeStatus)
+                                            complete(StatusCodes.Accepted, s"DesiredChargeStatusMessage(${desiredChargeStatusMessage.deviceId},${desiredChargeStatusMessage.groupId},${desiredChargeStatusMessage.desiredChargeStatus}) received")
                 case None => complete(StatusCodes.InternalServerError)
               } 
           }

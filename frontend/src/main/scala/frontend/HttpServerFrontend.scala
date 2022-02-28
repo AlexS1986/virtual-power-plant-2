@@ -99,6 +99,12 @@ object HttpServerFrontend {
   final case class DeviceData(data:Double, currentHost:String) 
   implicit val deviceDataF = jsonFormat2(DeviceData)
 
+  final case class DesiredChargeStatusBody(desiredChargeStatus : Double)
+  implicit val desiredChargeStatusBodyF = jsonFormat1(DesiredChargeStatusBody)
+
+  final case class DesiredChargeStatusMessageBody(groupId: String, deviceId: String, desiredChargeStatus: Double)
+  implicit val DesiredChargeStatusMessageBodyF = jsonFormat3(DesiredChargeStatusMessageBody)
+
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[_] =
       ActorSystem(Behaviors.empty, "frontend")
@@ -145,7 +151,9 @@ object HttpServerFrontend {
                 ContentType(
                   MediaType.textWithFixedCharset("css", HttpCharsets.`UTF-8`)
                 )
-              ) 
+              )
+            case "details/main.js" => 
+              getFromResource("web/details/main.js", ContentTypes.`application/json`) 
           }
       },
       path("vpp" / Segment / "energies" / "delete" ) { vppId  => 
@@ -220,6 +228,14 @@ object HttpServerFrontend {
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceIdentifier.deviceId+ " requested for STOP in simulator."))
           }
         })
+      },
+      path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (vppId,deviceId) =>
+        post {
+          entity(as[DesiredChargeStatusBody]) { desiredChargeStatusBody =>
+            sendHttpRequest(DesiredChargeStatusMessageBody(vppId, deviceId, desiredChargeStatusBody.desiredChargeStatus).toJson,routeToTwin+"/charge-status",HttpMethods.POST)
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to set charge status of device $deviceId of VPP $vppId to ${desiredChargeStatusBody.desiredChargeStatus} received."))
+          }
+        }
       }, 
       path("simulator" / Segment / Segment / "start") { (vppId,deviceId) => 
         post {

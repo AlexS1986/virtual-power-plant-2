@@ -226,11 +226,9 @@ class VPPOverview {
                 const tdCapacity = tr.insertCell();
                 tdCapacity.appendChild(document.createTextNode("100"))
 
-
                 const tdHost = tr.insertCell();
                 tdHost.appendChild(document.createTextNode(deviceSimulatorToRender.currentHost))
                 //tdId.style.border = '1px solid black';
-
 
                 const tdDetails = tr.insertCell();
                 const detailsLink = document.createElement("a");

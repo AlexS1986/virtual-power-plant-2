@@ -51,6 +51,8 @@ object DeviceManager {
     */
   final case class StopDevice(deviceId: String, groupId: String) extends Command
 
+  final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command
+
   /**
     * a message that requests to record data from hardware in the associated Device in the specified DeviceGroup
     *
@@ -117,6 +119,10 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case StopDevice(deviceId, groupId) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.StopDevice(deviceId)
+        this
+      case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 
+        val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
+        group ! DeviceGroup.SetDesiredChargeStatus(deviceId,desiredChargeStatus)
         this
       case RequestData(groupId, deviceId, replyTo) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)

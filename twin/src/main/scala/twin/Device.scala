@@ -95,7 +95,7 @@ object Device {
     */
   final case object StopDevice extends Command
 
-  //final case object DeviceUntracked extends Command
+  final case class SetDesiredChargeStatus(desiredChargeStatus: Double) extends Command
 
   /**
     * states that a device can assume
@@ -266,6 +266,11 @@ object Device {
                       implicit val system : ActorSystem[_] = context.system
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
                   }
+                  case SetDesiredChargeStatus(desiredChargeStatus) => Effect.none.thenRun{
+                    state => 
+                      implicit val system : ActorSystem[_] = context.system
+                      HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                  }
                 }
             }
         }
@@ -317,8 +322,11 @@ object Device {
       * @param groupId
       * @param deviceId
       */
-    final case class StopHardwareDevice(groupId:String, deviceId : String) extends HardwareDeviceCommand
+    final case class StopHardwareDevice(groupId: String, deviceId: String) extends HardwareDeviceCommand
     implicit val stopSimulationFormat = jsonFormat2(StopHardwareDevice)
+
+    final case class SetDesiredChargeStatusAtHardware(deviceId: String, groupId: String, desiredChargeStatus: Double) extends HardwareDeviceCommand
+    implicit val setDesiredChargeStatusAtHardwareFormat = jsonFormat3(SetDesiredChargeStatusAtHardware)
 
     /**
       * sends a command to the hardware
@@ -332,13 +340,17 @@ object Device {
         val responseFuture: Future[HttpResponse] = Http().singleRequest(request)
       }
 
+      val simulatorConfig = system.settings.config.getConfig("simulator")
+      val host = simulatorConfig.getString("host")
+      val port = simulatorConfig.getString("port")
+
       deviceCommand match {
         case stopSimulation : StopHardwareDevice => 
-          val simulatorConfig = system.settings.config.getConfig("simulator")
-          val host = simulatorConfig.getString("host")
-          val port = simulatorConfig.getString("port")
-          val routeToSimulator = "http://" + host + ":" + port + "/simulator" + "/stop"
-          sendJsonViaHttp(stopSimulation.toJson, routeToSimulator,HttpMethods.POST)
+          val route = "http://" + host + ":" + port + "/simulator" + "/stop"
+          sendJsonViaHttp(stopSimulation.toJson, route,HttpMethods.POST)
+        case setDesiredChargeStatusAtHardware : SetDesiredChargeStatusAtHardware =>
+          val route = "http://" + host + ":" + port + "/simulator" + "/charge-status" 
+          sendJsonViaHttp(setDesiredChargeStatusAtHardware.toJson, route,HttpMethods.POST)
       }
     }
   }

@@ -50,6 +50,16 @@ object SimulatorHttpServer {
   implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
 
   /**
+    * used to parse the body of HttpRequest to communicate a desired charge status to this hardware
+    *
+    * @param deviceId
+    * @param groupId
+    * @param desiredChargeStatus
+    */
+  final case class DesiredChargeStatusMessage(deviceId : String, groupId : String, desiredChargeStatus : Double)
+  implicit val desiredChargeStatusMessageFormat = jsonFormat3(DesiredChargeStatusMessage)
+
+  /**
     * the user guardian of the simulator application
     */
   object SimulatorGuardian {
@@ -95,7 +105,16 @@ object SimulatorHttpServer {
       * @param deviceId
       * @param groupId
       */
-    final case class ConfirmStop(deviceId : String, groupId : String) extends Command
+    final case class ConfirmStop(deviceId: String, groupId: String) extends Command
+
+    /**
+      * this message is sent to the guardian in order tell a particular DeviceSimulator to set its desired charge status
+      *
+      * @param deviceId
+      * @param groupId
+      * @param desiredChargeStatus
+      */
+    final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command
 
     def apply(): Behaviors.Receive[Command] = getNewBehavior(Map.empty)
 
@@ -131,6 +150,14 @@ object SimulatorHttpServer {
               val uniqueDeviceId = DeviceSimulator.makeEntityId(gId, dId)
               val newUniqueDeviceId2ActorRef = uniqueDeviceId2ActorRef - uniqueDeviceId
               getNewBehavior(newUniqueDeviceId2ActorRef)
+          case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 
+              val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
+              uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
+              case Some(deviceSimulator) =>
+                deviceSimulator ! DeviceSimulator.SetDesiredChargeStatus(desiredChargeStatus)
+                Behaviors.same
+              case None => Behaviors.same
+            }
           case _ => Behaviors.unhandled
         }
       }
@@ -171,6 +198,14 @@ object SimulatorHttpServer {
           )
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Stop request received."))
         }
+      },
+      path("simulator" / "charge-status") {
+        post {
+            entity(as[DesiredChargeStatusMessage]) { desiredChargeStatusMessage =>
+            system ! SimulatorGuardian.SetDesiredChargeStatus(desiredChargeStatusMessage.deviceId, desiredChargeStatusMessage.groupId,desiredChargeStatusMessage.desiredChargeStatus)
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "SetDesiredChargeStatusRequest received. Set to:" +  desiredChargeStatusMessage.desiredChargeStatus))
+          }
+        }  
       }
     )
 
