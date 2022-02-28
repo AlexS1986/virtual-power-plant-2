@@ -1,3 +1,6 @@
+.metals/
+.vscode/
+
 twin/target/*
 twin/target/streams/*
 twin/target/

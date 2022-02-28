@@ -98,6 +98,7 @@ $(document).ready(function () {
         //totalPowerBoard.sendRandomMessageToServer()
         //totalPowerBoard.getDataFromServer()
         totalPowerBoard.plotTotalPowerBoard()
+        totalPowerBoard.sendDataToServer(defaultGroupName)
 
         // clean up database, TODO do this serverside?
         if(deleteCounter % 5 == 0 ) {

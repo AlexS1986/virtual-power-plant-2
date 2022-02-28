@@ -105,6 +105,10 @@ object HttpServerFrontend {
   final case class DesiredChargeStatusMessageBody(groupId: String, deviceId: String, desiredChargeStatus: Double)
   implicit val DesiredChargeStatusMessageBodyF = jsonFormat3(DesiredChargeStatusMessageBody)
 
+  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int)
+  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat3(TotalDesiredEnergyOutputMessage)
+  //var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": this.desiredPowers[this.desiredPowers.length-1], "priority": 2})
+
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[_] =
       ActorSystem(Behaviors.empty, "frontend")
@@ -156,6 +160,14 @@ object HttpServerFrontend {
               getFromResource("web/details/main.js", ContentTypes.`application/json`) 
           }
       },
+      
+      path("vpp" / Segment / "desired-total-energy-output") { vppId =>
+        post {
+          entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
+            complete(StatusCodes.OK, "Desired total energy output received as" + totalDesiredEnergyOutputMessage.toJson.toString)
+          }
+        }
+      },
       path("vpp" / Segment / "energies" / "delete" ) { vppId  => 
         post {
           entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest => 
@@ -165,11 +177,11 @@ object HttpServerFrontend {
           }
         }
       },
-      path("vpp" / Segment / "energies") {  vppId => 
+      path("vpp" / Segment / "energies") { vppId => 
         get {
           parameter("before") { before => 
             parameter("after") { after => 
-              onComplete{ // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/future-directives/onComplete.html
+              onComplete { // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/future-directives/onComplete.html
                 val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 val dates = Try {
                   (LocalDateTime.parse(before), LocalDateTime.parse(after))
@@ -189,7 +201,7 @@ object HttpServerFrontend {
         }
       },
       path("vpp" / Segment) { vppId => 
-        get{
+        get {
           onComplete{
             sendHttpRequest(VppIdentifier(vppId).toJson,routeToTwin+"/data-all",HttpMethods.GET)
           }{
@@ -198,7 +210,7 @@ object HttpServerFrontend {
           }
         }
       },
-      path ("vpp" / "device" / Segment / Segment ) { (vppId,deviceId) => // get particular device data in twin service
+      path ("vpp" / "device" / Segment / Segment ) { (vppId, deviceId) => // get particular device data in twin service
         concat(get {
           onComplete{
             val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
@@ -211,9 +223,9 @@ object HttpServerFrontend {
               } {
                 case Success(deviceData) => val twirlPage = html.testTwirl(vppId,deviceId,deviceData)
                   complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, twirlPage.toString))
-                case Failure(exception) => complete(StatusCodes.InternalServerError,s"An error occurred: ${exception.getMessage}")
+                case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
               }                                 
-            case Failure(exception) => complete(StatusCodes.InternalServerError,s"An error occurred: ${exception.getMessage}")
+            case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
           }
         },
         post {
