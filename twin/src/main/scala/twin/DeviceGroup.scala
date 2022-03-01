@@ -83,6 +83,8 @@ object DeviceGroup {
 
   final case class SetDesiredChargeStatus(deviceId: String, desiredChargeStatus: Double) extends Command
 
+  final case class ResetPriority(deviceId: String) extends Command
+
   /**
     * a message that requests to report the Data for a Device 
     *
@@ -243,7 +245,12 @@ object DeviceGroup {
                   Effect.none
                 case SetDesiredChargeStatus(deviceId, desiredChargeStatus) => if(devicesRegistered.contains(deviceId)) {
                     val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                    device ! Device.SetDesiredChargeStatus(desiredChargeStatus)
+                    device ! Device.SetDesiredChargeStatus(desiredChargeStatus, Device.Priorities.High)
+                  }
+                  Effect.none
+                case ResetPriority(deviceId) => if(devicesRegistered.contains(deviceId)) {
+                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                    device ! Device.ResetPriority
                   }
                   Effect.none
                 case RequestData(deviceId,replyTo) => if(devicesRegistered.contains(deviceId)) {

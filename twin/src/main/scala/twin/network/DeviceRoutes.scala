@@ -72,7 +72,7 @@ private[twin] final class DeviceRoutes(
     if (deviceManagers.isEmpty) {
       None
     } else {
-      println(deviceManagers((math.random() * deviceManagers.size).toInt))
+      //println(deviceManagers((math.random() * deviceManagers.size).toInt))
       Some(deviceManagers((math.random() * deviceManagers.size).toInt))
     }
   }
@@ -119,17 +119,30 @@ private[twin] final class DeviceRoutes(
           }
         }
       },
+      path("twin" / "charge-status" / "priority" / "reset") {
+        //println("CHARGE STATUS RESET RECEIVED")
+        post {
+          entity(as[DeviceIdentifier]) { 
+              deviceIdentifier =>
+                getDeviceManager match {
+                  case Some(deviceManager) => deviceManager ! DeviceManager.ResetPriority(deviceIdentifier.deviceId, deviceIdentifier.groupId)
+                                              complete(StatusCodes.Accepted, s"Request to reset the charge status command priority of device ${deviceIdentifier.deviceId} in VPP ${deviceIdentifier.groupId} received.")
+                  case None => complete(StatusCodes.InternalServerError)
+                } 
+            }
+        } 
+      },
       path("twin" / "charge-status") {
-        post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
-          entity(as[DesiredChargeStatusMessage]) { 
-            desiredChargeStatusMessage =>
-              getDeviceManager match {
-                case Some(deviceManager) => deviceManager ! DeviceManager.SetDesiredChargeStatus(desiredChargeStatusMessage.deviceId,desiredChargeStatusMessage.groupId,desiredChargeStatusMessage.desiredChargeStatus)
-                                            complete(StatusCodes.Accepted, s"DesiredChargeStatusMessage(${desiredChargeStatusMessage.deviceId},${desiredChargeStatusMessage.groupId},${desiredChargeStatusMessage.desiredChargeStatus}) received")
-                case None => complete(StatusCodes.InternalServerError)
-              } 
+          post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
+            entity(as[DesiredChargeStatusMessage]) { 
+              desiredChargeStatusMessage =>
+                getDeviceManager match {
+                  case Some(deviceManager) => deviceManager ! DeviceManager.SetDesiredChargeStatus(desiredChargeStatusMessage.deviceId,desiredChargeStatusMessage.groupId,desiredChargeStatusMessage.desiredChargeStatus)
+                                              complete(StatusCodes.Accepted, s"DesiredChargeStatusMessage(${desiredChargeStatusMessage.deviceId},${desiredChargeStatusMessage.groupId},${desiredChargeStatusMessage.desiredChargeStatus}) received")
+                  case None => complete(StatusCodes.InternalServerError)
+                } 
+            }
           }
-        }
       },
       path("twin" / "data") {
         concat(
@@ -151,10 +164,10 @@ private[twin] final class DeviceRoutes(
                     .map {
                       deviceResponse =>
                         deviceResponse match {
-                          case Device.RespondData(_,Device.DeviceState(_,Some(lastChargeStatusReading),_),Some(currentHost)) => 
+                          case Device.RespondData(_,Device.DeviceState(_,Some(lastChargeStatusReading),_,_),Some(currentHost)) => 
                               val dataJson = DeviceData(lastChargeStatusReading,currentHost).toJson
                               dataJson.toString
-                          case Device.RespondData(_, Device.DeviceState(_,None,_),_) => "{}"
+                          case Device.RespondData(_, Device.DeviceState(_,None,_,_),_) => "{}"
                           case _ => "{}" 
                     }
                   }

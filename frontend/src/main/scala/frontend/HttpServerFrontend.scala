@@ -242,13 +242,19 @@ object HttpServerFrontend {
         })
       },
       path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (vppId,deviceId) =>
-        post {
-          entity(as[DesiredChargeStatusBody]) { desiredChargeStatusBody =>
-            sendHttpRequest(DesiredChargeStatusMessageBody(vppId, deviceId, desiredChargeStatusBody.desiredChargeStatus).toJson,routeToTwin+"/charge-status",HttpMethods.POST)
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to set charge status of device $deviceId of VPP $vppId to ${desiredChargeStatusBody.desiredChargeStatus} received."))
+        concat(
+          post {
+            entity(as[DesiredChargeStatusBody]) { desiredChargeStatusBody =>
+              sendHttpRequest(DesiredChargeStatusMessageBody(vppId, deviceId, desiredChargeStatusBody.desiredChargeStatus).toJson,routeToTwin+"/charge-status",HttpMethods.POST)
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to set charge status of device $deviceId of VPP $vppId to ${desiredChargeStatusBody.desiredChargeStatus} received."))
+            }
+          },
+          delete {
+              sendHttpRequest(DeviceIdentifier(deviceId, vppId).toJson,routeToTwin+"/charge-status/priority/reset",HttpMethods.POST)
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to release manual charge status specification of device $deviceId in VPP $vppId received"))
           }
-        }
-      }, 
+        )
+      },
       path("simulator" / Segment / Segment / "start") { (vppId,deviceId) => 
         post {
           sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToSimulator+"/start",HttpMethods.POST)

@@ -53,6 +53,8 @@ object DeviceManager {
 
   final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command
 
+  final case class ResetPriority(deviceId: String, groupId: String) extends Command
+
   /**
     * a message that requests to record data from hardware in the associated Device in the specified DeviceGroup
     *
@@ -123,6 +125,10 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.SetDesiredChargeStatus(deviceId,desiredChargeStatus)
+        this
+      case ResetPriority(deviceId, groupId) => 
+        val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
+        group ! DeviceGroup.ResetPriority(deviceId)
         this
       case RequestData(groupId, deviceId, replyTo) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)

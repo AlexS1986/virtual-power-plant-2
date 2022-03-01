@@ -15,5 +15,17 @@ $(document).ready(function () {
             ev.preventDefault()
         },false);
 
+        var releaseManualControlButton = document.getElementById('release-manual-button')
+
+        releaseManualControlButton.onclick = function (event) {
+            const deviceId = event.currentTarget.getAttribute("deviceId")
+            const groupId = event.currentTarget.getAttribute("groupId")
+
+            var headers = {"Content-Type" : "application/json"}
+            //var data = JSON.stringify({"deviceId": deviceId,"groupId": groupId, "desiredChargeStatus" : desiredChargeStatus })
+            //var data = JSON.stringify({})
+            Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId + "/charge-status","DELETE",null,headers)
+            
+        }
     }
 )

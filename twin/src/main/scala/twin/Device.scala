@@ -30,6 +30,8 @@ import akka.actor.SupervisorStrategy
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
+import twin.Device.Priorities.High
+import twin.Device.Priorities.Low
 
 
 /** represents the digital twin of a device
@@ -95,7 +97,14 @@ object Device {
     */
   final case object StopDevice extends Command
 
-  final case class SetDesiredChargeStatus(desiredChargeStatus: Double) extends Command
+  /**
+    * 
+    *
+    * @param desiredChargeStatus
+    */
+  final case class SetDesiredChargeStatus(desiredChargeStatus: Double, priority: Priority) extends Command
+
+  final case object ResetPriority extends Command
 
   /**
     * states that a device can assume
@@ -112,7 +121,8 @@ object Device {
   final case class DeviceState(
     capacity: Double,
     lastChargeStatusReading: Option[Double],
-    lastDeliveredEnergyReading: Option[Double]
+    lastDeliveredEnergyReading: Option[Double],
+    priority: Priority,
   ) extends State
 
   /**
@@ -136,6 +146,23 @@ object Device {
     deliveredEnergy: Double,
     deliveredEnergyDate: LocalDateTime,
   ) extends Event
+
+  sealed trait Priority {
+    def > (o:Priority) : Boolean = {
+      this match {
+        case Priorities.High => if(o == Priorities.Low) true else false 
+        case Priorities.Low => false
+      }
+    }
+  }
+  
+  // TODO check if that is good style
+  final case object Priorities {
+    final case object High extends Priority 
+    final case object Low extends Priority
+  }
+  
+  final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event
 
   /**
     * defines a type of an entity for cluster sharding
@@ -253,7 +280,7 @@ object Device {
         val commandHandler : (State, Command) => Effect[Event, State] = { 
           (state, cmd) =>
             state match {
-              case DeviceState(capacity,lastChargeStatusReading,lastDeliveredEnergyReading) =>
+              case DeviceState(capacity,lastChargeStatusReading,lastDeliveredEnergyReading, priority) =>
                 cmd match {
                   case cmd: RecordData =>
                     recordData(persistenceId.id, cmd)
@@ -266,11 +293,35 @@ object Device {
                       implicit val system : ActorSystem[_] = context.system
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
                   }
-                  case SetDesiredChargeStatus(desiredChargeStatus) => Effect.none.thenRun{
+                  case SetDesiredChargeStatus(desiredChargeStatus, priorityOfMessage) => 
+                    priorityOfMessage match {
+                      case pm if pm > priority => 
+                        Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,pm)).thenRun{
+                          state : State => 
+                          implicit val system : ActorSystem[_] = context.system
+                          HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                        }
+                      case pm if pm == priority => 
+                        Effect.none.thenRun{
+                          state : State => 
+                          implicit val system : ActorSystem[_] = context.system
+                          HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                        }
+                      case pm => Effect.none
+                    }
+                  case ResetPriority => 
+                    //println("CHARGE STATUS RESET RECEIVED AT DEVICE")
+                    priority match {
+                      case High => Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,Low))
+                      case Low => Effect.none
+                    }
+
+                    /*Effect.none.thenRun{
                     state => 
                       implicit val system : ActorSystem[_] = context.system
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
-                  }
+                  }*/
+                  //case ReleaseManualChargeStatusControl => 
                 }
             }
         }
@@ -280,15 +331,16 @@ object Device {
           */
         val eventHandler: (State, Event) => State = { (state, event) =>
           (state,event) match {
-            case (s: DeviceState,e: EventDataRecorded) => 
-              DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy))
-            case _ => DeviceState(0,None,None)
-
+            case (s: DeviceState, e: EventDataRecorded) => 
+              DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy), s.priority)
+            case(s: DeviceState, e: EventChargeStatusPrioritySet) =>
+              DeviceState(s.capacity, s.lastChargeStatusReading, s.lastChargeStatusReading, e.priority)
+            //case _ => DeviceState(0,None,None,false)
           }
         }
 
         // returns the behavior
-        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None,Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
       }
     }
     getNewBehaviour(groupId,deviceId,None)
