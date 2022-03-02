@@ -65,7 +65,7 @@ class TotalPowerBoard {
     sendDataToServer(vppId)  {
         var headers = {"Content-Type" : "application/json"}
             //var data = JSON.stringify({"deviceId": deviceId,"groupId": groupId, "desiredChargeStatus" : desiredChargeStatus })
-        var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": this.desiredPowers[this.desiredPowers.length-1], "priority": 2})
+        var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": parseFloat(this.desiredPowers[this.desiredPowers.length-1]), "priority": 2})
         Util.sendRequestToServer("/vpp/"+vppId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
     }
 

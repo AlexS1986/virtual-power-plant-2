@@ -106,6 +106,8 @@ object Device {
 
   final case object ResetPriority extends Command
 
+  final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command
+
   /**
     * states that a device can assume
     */
@@ -163,6 +165,8 @@ object Device {
   }
   
   final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event
+
+  
 
   /**
     * defines a type of an entity for cluster sharding
@@ -294,8 +298,10 @@ object Device {
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
                   }
                   case SetDesiredChargeStatus(desiredChargeStatus, priorityOfMessage) => 
+                    println("SET DESIRED CHARGE STATUS MESSAGE RECEIVED AT DEVICE " + s"${priorityOfMessage} ${priority}" )
                     priorityOfMessage match {
                       case pm if pm > priority => 
+                         println("SET DESIRED CHARGE STATUS MESSAGE RECEIVED AT DEVICE UNPACKED " + s"${pm}  > ${priority} ?" )
                         Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,pm)).thenRun{
                           state : State => 
                           implicit val system : ActorSystem[_] = context.system
@@ -310,10 +316,32 @@ object Device {
                       case pm => Effect.none
                     }
                   case ResetPriority => 
-                    //println("CHARGE STATUS RESET RECEIVED AT DEVICE")
+                    println("CHARGE STATUS RESET RECEIVED AT DEVICE " + priority)
                     priority match {
                       case High => Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,Low))
                       case Low => Effect.none
+                    }
+                  
+                  case ModifyChargeStatus(percentOfCapacity) => 
+                    println("MODIFY CHARGE STATUS RECEIVED AT DEVICE " + percentOfCapacity)
+                    println("CURRENT DEVICE STATUS " + priority)
+                    priority match {
+                      case High => Effect.none
+                      case Low => Effect.none.thenRun{ state =>
+                        println("LAST CHARGE STATUS READING" + lastChargeStatusReading)
+                        lastChargeStatusReading match {
+                          case Some(currentChargeStatus) => 
+                            println("LAST CHARGE STATUS READING UNPACKED" + currentChargeStatus)
+                            implicit val system : ActorSystem[_] = context.system
+                            import math._
+                            val upperBound = 1.0
+                            val lowerBound = 0.0
+                            val desiredChargeStatusOfDevice = math.min(math.max(lowerBound,(currentChargeStatus+percentOfCapacity/100.0)),upperBound)
+                            HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatusOfDevice))
+                          case None => // cannot handle
+                        }
+                        
+                      }
                     }
 
                     /*Effect.none.thenRun{

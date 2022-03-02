@@ -164,6 +164,7 @@ object HttpServerFrontend {
       path("vpp" / Segment / "desired-total-energy-output") { vppId =>
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
+            sendHttpRequest(totalDesiredEnergyOutputMessage.toJson,routeToTwin+"/desired-total-energy-output", HttpMethods.POST)
             complete(StatusCodes.OK, "Desired total energy output received as" + totalDesiredEnergyOutputMessage.toJson.toString)
           }
         }
@@ -182,7 +183,7 @@ object HttpServerFrontend {
           parameter("before") { before => 
             parameter("after") { after => 
               onComplete { // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/future-directives/onComplete.html
-                val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                //val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 val dates = Try {
                   (LocalDateTime.parse(before), LocalDateTime.parse(after))
                 } 
@@ -216,9 +217,9 @@ object HttpServerFrontend {
             val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
           }{                           
-            case Success(result) => 
+            case Success(httpResponse) => 
               onComplete {
-                val deviceDataF = Unmarshal(result).to[DeviceData]
+                val deviceDataF = Unmarshal(httpResponse).to[DeviceData]
                 deviceDataF
               } {
                 case Success(deviceData) => val twirlPage = html.testTwirl(vppId,deviceId,deviceData)

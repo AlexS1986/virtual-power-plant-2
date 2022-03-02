@@ -85,6 +85,8 @@ object DeviceGroup {
 
   final case class ResetPriority(deviceId: String) extends Command
 
+  final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double, currentEnergyOutput: Double) extends Command
+
   /**
     * a message that requests to report the Data for a Device 
     *
@@ -238,26 +240,69 @@ object DeviceGroup {
                 case RequestUnTrackDevice(_, deviceId) =>
                   context.log.info("Device actor for {} has been terminated", deviceId)
                   unregisterDevice(persistenceId, deviceId)
-                case StopDevice(deviceId) => if(devicesRegistered.contains(deviceId)) {
-                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                    device ! Device.StopDevice
+                case StopDevice(deviceId) => // TODO set priority to high so entity is not called anymore?
+                  Effect.none.thenRun{ state => 
+                    if(devicesRegistered.contains(deviceId)) {
+                      val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                      device ! Device.StopDevice
+                    }
                   }
-                  Effect.none
-                case SetDesiredChargeStatus(deviceId, desiredChargeStatus) => if(devicesRegistered.contains(deviceId)) {
-                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                    device ! Device.SetDesiredChargeStatus(desiredChargeStatus, Device.Priorities.High)
+                case SetDesiredChargeStatus(deviceId, desiredChargeStatus) => 
+                  Effect.none.thenRun {
+                    state => 
+                    if(devicesRegistered.contains(deviceId)) {
+                      println("SET DESIRED CHARGESTATUS AT GROUP " + deviceId)
+                      val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                      device ! Device.SetDesiredChargeStatus(desiredChargeStatus, Device.Priorities.High)
+                    }
                   }
-                  Effect.none
-                case ResetPriority(deviceId) => if(devicesRegistered.contains(deviceId)) {
-                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                    device ! Device.ResetPriority
+                case DesiredTotalEnergyOutput(desiredTotalEnergyOutput, currentEnergyOutput) => 
+                  println("DESIRED TOTAL ENERGY OUTPUT AT GROUP " + desiredTotalEnergyOutput + " " + currentEnergyOutput)
+                  Effect.none.thenRun{ state =>
+                    val capacityOfDevice = 100.0
+                    val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
+                    val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
+                    
+                    val deltaEnergyOutput = desiredTotalEnergyOutput - currentEnergyOutput
+                    
+                    val targetTotalPercentageChangeOfChargeStatus = math.abs(desiredTotalEnergyOutput - currentEnergyOutput) / averageEnergyStoredInVpp * 100.0
+                    val numberOfStepsToAchieveDesiredTotalEnergyOutput = 5.0
+
+                    val targetPercentageChangeOfChargeStatusThisStep = targetTotalPercentageChangeOfChargeStatus / numberOfStepsToAchieveDesiredTotalEnergyOutput
+
+                    val maxPercentageChangeOfChargeStatusPerStep = 10.0
+                    val percentageChangeOfChargeStatusThisStep = math.min(targetPercentageChangeOfChargeStatusThisStep,maxPercentageChangeOfChargeStatusPerStep)
+
+                    (desiredTotalEnergyOutput, currentEnergyOutput) match {
+                    case (d,c) if (d > c) && math.abs(d-c) > 2.0 => 
+                      for (dId <- devicesRegistered) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                        device ! Device.ModifyChargeStatus(-percentageChangeOfChargeStatusThisStep)
+                      }
+                    case (d,c) if (d < c) && math.abs(d-c) > 2.0 =>
+                      for (dId <- devicesRegistered) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                        device ! Device.ModifyChargeStatus(+percentageChangeOfChargeStatusThisStep)
+                      }
+                    case _ => println("DID NOT DELIVER ANY MESSAGE TO DEVICE " + desiredTotalEnergyOutput + " " +currentEnergyOutput + " " + math.abs(desiredTotalEnergyOutput-currentEnergyOutput) )
+                    }
                   }
-                  Effect.none
-                case RequestData(deviceId,replyTo) => if(devicesRegistered.contains(deviceId)) {
-                    val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
-                    device ! Device.ReadData(replyTo)
+                case ResetPriority(deviceId) => 
+                  Effect.none.thenRun{
+                    state =>
+                      if(devicesRegistered.contains(deviceId)) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                        device ! Device.ResetPriority
+                      }
                   }
-                  Effect.none
+                case RequestData(deviceId,replyTo) => 
+                  Effect.none.thenRun{
+                    state => 
+                      if(devicesRegistered.contains(deviceId)) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                        device ! Device.ReadData(replyTo)
+                      }
+                  }
                 case RecordData(deviceId, capacity, chargeStatus, deliveredEnergy, deliveredEnergyDate) => 
                   if(devicesRegistered.contains(deviceId)) {
                     val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
@@ -265,12 +310,14 @@ object DeviceGroup {
                   } 
                   Effect.none
                 case RequestAllData(replyTo) =>
-                  val deviceId2EntityRefSnapshot =  for {
-                        dId <- devicesRegistered
-                      } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
-                  context.spawnAnonymous(
+                  
+                      Effect.none.thenRun{ state =>
+                        val deviceId2EntityRefSnapshot =  for {
+                          dId <- devicesRegistered
+                        } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
+                        context.spawnAnonymous(
                         DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap, requestId = 0,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
-                      Effect.none
+                      }
                   
                    /* requestAllData match { 
                   case DeviceManager.RequestAllData(gId, replyTo) =>

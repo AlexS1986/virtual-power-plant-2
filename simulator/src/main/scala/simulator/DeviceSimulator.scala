@@ -289,6 +289,8 @@ object DeviceSimulator {
     // the new chargeStatus
     val newChargeStatus = (chargeStatus*capacity+energyStoredInLocalHardware)/capacity
 
+    println("")
+    println("DeviceId GroupId:" + deviceId + " " + groupId)
     println("secondsOfDay: " + secondsOfDay)
     println("randomPart " + random)
     println("periodicLocalEnergyProduction " + periodicLocalEnergyProduction)
