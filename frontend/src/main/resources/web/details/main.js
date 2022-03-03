@@ -27,5 +27,31 @@ $(document).ready(function () {
             Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId + "/charge-status","DELETE",null,headers)
             
         }
+
+        function refresh() {
+            function dataFromServerHandler() { // TODO function definitions outside of loop?
+                if (this.readyState == 4) {
+                    if (this.status == 200) {
+                        if (this.responseText != null) {
+                            var deviceDataFromServerJson = JSON.parse(this.response)
+                            
+                            //set charge status in percent
+                            const data = deviceDataFromServerJson.data
+                            const dataDiv = document.getElementById("charge-status-div")
+                            dataDiv.innerHTML = data*100.0
+                            console.log("Hi")
+                        } else alert("Communication error: No data received")
+                    } else alert("Communication error: " + this.statusText)
+                }
+            }
+
+            var headers = {}
+            const deviceId = document.getElementById("release-manual-button").getAttribute("deviceId")
+            const groupId = document.getElementById("release-manual-button").getAttribute("groupId")
+
+            Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId,"GET",null,headers,dataFromServerHandler)
+        }
+
+        const intervalId = setInterval(refresh, 1 * 2000)
     }
 )

@@ -102,7 +102,7 @@ private[twin] final class DeviceRoutes(
   final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
   implicit val energyDepositedFormat = jsonFormat3(EnergyDepositedRequest)
 
-    final case class EnergyDepositedResponse(energyDeposited : Option[Double])
+  final case class EnergyDepositedResponse(energyDeposited : Option[Double])
   implicit val energyDepositedResponseFormat = jsonFormat1(EnergyDepositedResponse)
 
   final case class GroupIdentifier(groupId: String)
@@ -194,6 +194,12 @@ private[twin] final class DeviceRoutes(
       path("twin" / "desired-total-energy-output") {
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
+            getDeviceManager match {
+                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, 0.0) // TODO LAST VALUE IS IGNORED ANYWAY
+                                                      complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.vppId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
+                          case None => complete(StatusCodes.InternalServerError)
+                        }
+            /*
             onComplete {
               val now = LocalDateTime.now()
               val before = now.minusSeconds(2)
@@ -231,7 +237,7 @@ private[twin] final class DeviceRoutes(
                 case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
               }
               case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
-            }            
+            } */            
           }
         }
       },

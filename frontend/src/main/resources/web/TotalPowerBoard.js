@@ -1,12 +1,13 @@
 "use strict"
 
 class TotalPowerBoard {
-    constructor(time,desiredPowers,htmlElementToPlotInto, htmlFormElementThatProvidesDesiredPower) {
+    constructor(time,desiredPowers,htmlElementToPlotInto, htmlFormElementThatProvidesDesiredPower,vppId) {
         this.time = time
         this.desiredPowers = desiredPowers
         this.currentPowers = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,]
         this.htmlElementToPlotInto = htmlElementToPlotInto
         this.attachToFormElement(htmlFormElementThatProvidesDesiredPower)
+        this.vppId = vppId
     }
 
 
@@ -59,14 +60,15 @@ class TotalPowerBoard {
             ev.currentTarget.attachedTotalPowerBoard.updateDesiredPower(this[0].value)
             console.log("Desired power set to: "+this[0].value)
             ev.preventDefault()
+            ev.currentTarget.attachedTotalPowerBoard.sendDataToServer()
         },false);
     }
 
-    sendDataToServer(vppId)  {
+    sendDataToServer()  {
         var headers = {"Content-Type" : "application/json"}
             //var data = JSON.stringify({"deviceId": deviceId,"groupId": groupId, "desiredChargeStatus" : desiredChargeStatus })
-        var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": parseFloat(this.desiredPowers[this.desiredPowers.length-1]), "priority": 2})
-        Util.sendRequestToServer("/vpp/"+vppId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
+        var data = JSON.stringify({"vppId": this.vppId, "desiredEnergyOutput": parseFloat(this.desiredPowers[this.desiredPowers.length-1]), "priority": 2})
+        Util.sendRequestToServer("/vpp/"+this.vppId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
     }
 
     getDataFromServer(vppId,before,after) {
@@ -102,7 +104,7 @@ class TotalPowerBoard {
             }
         }
 
-        var headers = {"Content-Type" : "application/json"}
+        //var headers = {"Content-Type" : "application/json"}
         var data = JSON.stringify({"vppId": vppId,"before": before,"after": after })
         let beforeTest = before.replace(" ","T")
         let afterTest = after.replace(" ","T")

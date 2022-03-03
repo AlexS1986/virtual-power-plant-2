@@ -24,7 +24,28 @@ import akka.persistence.typed.scaladsl.Effect
 import akka.persistence.typed.scaladsl.EventSourcedBehavior
 import akka.protobufv3.internal.Type
 import akka.cluster.sharding.typed.scaladsl.Entity
+
 import java.time.LocalDateTime
+import spray.json.JsValue
+import akka.http.scaladsl.model.HttpMethod
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.ContentTypes
+import scala.concurrent.Future
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.Http
+
+
+import spray.json._
+import spray.json.DefaultJsonProtocol._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import scala.util.parsing.json._
+import java.time.format.DateTimeFormatter
+import akka.http.scaladsl.model.HttpMethods
+import scala.util.Failure
+import scala.util.Success
+import akka.http.scaladsl.unmarshalling.Unmarshal
+import twin.network.DeviceRoutes
 
 /**
   * represents a group of Devices, i.e. digital twins of hardware. Thus, it represents a Virtual Power Plant.
@@ -87,6 +108,8 @@ object DeviceGroup {
 
   final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double, currentEnergyOutput: Double) extends Command
 
+  final case object AdjustTotalEnergyOutput extends Command
+
   /**
     * a message that requests to report the Data for a Device 
     *
@@ -115,12 +138,14 @@ object DeviceGroup {
     */
   sealed trait State
 
+  
   /**
-    * state is defined by the current members, i.e. Devices, in this group
+    * state is defined by the current members, i.e. Devices, in this group and the desired total energy output
     *
     * @param registeredDevices the set of the PersistenceIds of the members of this group
+    * @param desiredTotalEnergyOutput
     */
-  final case class StateDevicesRegistered(registeredDevices: Set[String]) extends State
+  final case class DeviceGroupState(registeredDevices: Set[String], desiredTotalEnergyOutput: Double) extends State
 
   /**
     * events that change the state of this actor
@@ -142,6 +167,8 @@ object DeviceGroup {
     * @param deviceId
     */                                                                             
   final case class EventDeviceUnRegistered(persistenceId: String, deviceId: String) extends Event
+
+  final case class EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput:Double) extends Event
 
   /**
     * defines a type of an entity for cluster sharding
@@ -181,7 +208,7 @@ object DeviceGroup {
         * @param replyTo confirmation of the registration is sent to this actor
         * @return
         */
-      def registerDevice(persistenceId: PersistenceId,deviceId: String,replyTo: ActorRef[RespondTrackDevice]): Effect[Event, State] = {
+      def registerDevice(persistenceId: PersistenceId, deviceId: String, replyTo: ActorRef[RespondTrackDevice]): Effect[Event, State] = {
         Effect.persist(EventDeviceRegistered(persistenceId.id, deviceId)).thenRun {
           state => replyTo ! RespondTrackDevice(deviceId) //DeviceManager.DeviceRegistered(deviceId)
         }
@@ -207,7 +234,7 @@ object DeviceGroup {
             */
         val commandHandler: (State, Command) => Effect[Event, State] = { (state, cmd) =>
           state match {
-            case StateDevicesRegistered(devicesRegistered) =>
+            case DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput) =>
               cmd match {
                 //case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
                   case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
@@ -257,7 +284,24 @@ object DeviceGroup {
                     }
                   }
                 case DesiredTotalEnergyOutput(desiredTotalEnergyOutput, currentEnergyOutput) => 
-                  println("DESIRED TOTAL ENERGY OUTPUT AT GROUP " + desiredTotalEnergyOutput + " " + currentEnergyOutput)
+                  Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput)).thenRun {
+                    println("DESIRED ENERGY OUTPUT RECEIVED AT GROUP")
+                    final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
+                    state => val auxActorRef = context.spawn(
+                      Behaviors.receive[SendAdjustTotalEnergyOuputToGroup]((ctx, message) => 
+                       
+                        message match {
+                        case SendAdjustTotalEnergyOuputToGroup(groupIdS) => 
+                           println("DESIRED ENERGY OUTPUT RECEIVED AT AUX ACTOR")
+                          val thisGroupEntity = sharding.entityRefFor(DeviceGroup.TypeKey, groupIdS)
+                          thisGroupEntity ! AdjustTotalEnergyOutput
+                          Behaviors.stopped
+                        }), "auxActor"+java.util.UUID.randomUUID().toString())
+                    import scala.concurrent.duration._
+                    context.scheduleOnce(2.seconds, auxActorRef,SendAdjustTotalEnergyOuputToGroup(groupId))
+                  }
+                  
+                  /*println("DESIRED TOTAL ENERGY OUTPUT AT GROUP " + desiredTotalEnergyOutput + " " + currentEnergyOutput)
                   Effect.none.thenRun{ state =>
                     val capacityOfDevice = 100.0
                     val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
@@ -286,7 +330,130 @@ object DeviceGroup {
                       }
                     case _ => println("DID NOT DELIVER ANY MESSAGE TO DEVICE " + desiredTotalEnergyOutput + " " +currentEnergyOutput + " " + math.abs(desiredTotalEnergyOutput-currentEnergyOutput) )
                     }
+                  } */
+                case AdjustTotalEnergyOutput => Effect.none.thenRun{ state =>
+
+                    println("ADJUST TOTAL ENERGY OUTPUT CALLED")
+
+
+                    final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
+                    val auxActorRef = context.spawn(
+                      Behaviors.receive[SendAdjustTotalEnergyOuputToGroup]((ctx, message) => message match {
+                        case SendAdjustTotalEnergyOuputToGroup(groupIdS) => 
+                           println("DESIRED ENERGY OUTPUT RECEIVED AT AUX ACTOR")
+                          val thisGroupEntity = sharding.entityRefFor(DeviceGroup.TypeKey, groupIdS)
+                          thisGroupEntity ! AdjustTotalEnergyOutput
+                          Behaviors.stopped
+                        }), "auxActor"+java.util.UUID.randomUUID().toString())
+                    import scala.concurrent.duration._
+                    context.scheduleOnce(2.seconds, auxActorRef,SendAdjustTotalEnergyOuputToGroup(groupId))
+                      
+                     
+
+                    implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
+                    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    def write(x: LocalDateTime) = JsString(formatter.format(x))
+                    def read(value: JsValue) = value match {
+                      case JsString(x) => LocalDateTime.parse(x, formatter)
+                      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
+                    }
                   }
+                                  /**
+                    * represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
+                    *
+                    * @param vppId
+                    * @param before
+                    * @param after
+                    */
+                  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
+                  implicit val energyDepositedFormat = jsonFormat3(EnergyDepositedRequest)
+
+                  final case class EnergyDepositedResponse(energyDeposited : Option[Double])
+                  implicit val energyDepositedResponseFormat = jsonFormat1(EnergyDepositedResponse)
+
+                  val now = LocalDateTime.now()
+                  val before = now.minusSeconds(2)
+                  val after = now.minusSeconds(12)
+                  implicit val actorSystem = context.system
+                  val readsideHost = context.system.settings.config.getConfig("readside").getString("host")
+                  val readsidePort = context.system.settings.config.getConfig("readside").getString("port")
+                  val routeToReadside = "http://" + readsideHost + ":" + readsidePort  + "/twin-readside"
+                  val httpResponseFuture = sendHttpRequest(EnergyDepositedRequest(groupId,before,after).toJson,routeToReadside+"/energies",HttpMethods.GET)
+
+                  implicit val executionContext = context.system.executionContext
+                  httpResponseFuture.onComplete {
+                    case Failure(exception) => 
+                    case Success(httpResponse) =>  
+                      val energyDepositedResponseF = Unmarshal(httpResponse).to[EnergyDepositedResponse]
+                      energyDepositedResponseF.onComplete {
+                        case Success(energyDepositedResponse) =>
+                          energyDepositedResponse.energyDeposited match {
+                            case Some(currentEnergyOutput) => 
+                              val capacityOfDevice = 100.0
+                              val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
+                              val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
+                              
+                              val deltaEnergyOutput = desiredTotalEnergyOutput - currentEnergyOutput
+                              
+                              val targetTotalPercentageChangeOfChargeStatus = math.abs(desiredTotalEnergyOutput - currentEnergyOutput) / averageEnergyStoredInVpp * 100.0
+                              val numberOfStepsToAchieveDesiredTotalEnergyOutput = 5.0
+
+                              val targetPercentageChangeOfChargeStatusThisStep = targetTotalPercentageChangeOfChargeStatus / numberOfStepsToAchieveDesiredTotalEnergyOutput
+
+                              val maxPercentageChangeOfChargeStatusPerStep = 10.0
+                              val percentageChangeOfChargeStatusThisStep = math.min(targetPercentageChangeOfChargeStatusThisStep,maxPercentageChangeOfChargeStatusPerStep)
+
+                              (desiredTotalEnergyOutput, currentEnergyOutput) match {
+                              case (d,c) if (d > c) && math.abs(d-c) > 2.0 => 
+                                for (dId <- devicesRegistered) {
+                                  val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                                  device ! Device.ModifyChargeStatus(-percentageChangeOfChargeStatusThisStep)
+                                }
+                              case (d,c) if (d < c) && math.abs(d-c) > 2.0 =>
+                                for (dId <- devicesRegistered) {
+                                  val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                                  device ! Device.ModifyChargeStatus(+percentageChangeOfChargeStatusThisStep)
+                                }
+                              case _ => println("DID NOT DELIVER ANY MESSAGE TO DEVICE " + desiredTotalEnergyOutput + " " +currentEnergyOutput + " " + math.abs(desiredTotalEnergyOutput-currentEnergyOutput) )
+                              }
+
+                            case None => 
+                          }
+                        case Failure(exception) => 
+                      }
+                  }
+                  //
+                  
+                  /*val currentEnergyOutput = 1.0
+
+                    val capacityOfDevice = 100.0
+                    val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
+                    val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
+                    
+                    val deltaEnergyOutput = desiredTotalEnergyOutput - currentEnergyOutput
+                    
+                    val targetTotalPercentageChangeOfChargeStatus = math.abs(desiredTotalEnergyOutput - currentEnergyOutput) / averageEnergyStoredInVpp * 100.0
+                    val numberOfStepsToAchieveDesiredTotalEnergyOutput = 5.0
+
+                    val targetPercentageChangeOfChargeStatusThisStep = targetTotalPercentageChangeOfChargeStatus / numberOfStepsToAchieveDesiredTotalEnergyOutput
+
+                    val maxPercentageChangeOfChargeStatusPerStep = 10.0
+                    val percentageChangeOfChargeStatusThisStep = math.min(targetPercentageChangeOfChargeStatusThisStep,maxPercentageChangeOfChargeStatusPerStep)
+
+                    (desiredTotalEnergyOutput, currentEnergyOutput) match {
+                    case (d,c) if (d > c) && math.abs(d-c) > 2.0 => 
+                      for (dId <- devicesRegistered) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                        device ! Device.ModifyChargeStatus(-percentageChangeOfChargeStatusThisStep)
+                      }
+                    case (d,c) if (d < c) && math.abs(d-c) > 2.0 =>
+                      for (dId <- devicesRegistered) {
+                        val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                        device ! Device.ModifyChargeStatus(+percentageChangeOfChargeStatusThisStep)
+                      }
+                    case _ => println("DID NOT DELIVER ANY MESSAGE TO DEVICE " + desiredTotalEnergyOutput + " " +currentEnergyOutput + " " + math.abs(desiredTotalEnergyOutput-currentEnergyOutput) )
+                    } */
+                }
                 case ResetPriority(deviceId) => 
                   Effect.none.thenRun{
                     state =>
@@ -340,24 +507,52 @@ object DeviceGroup {
         * processes persisted Events and may change the current State
         */
         val eventHandler: (State, Event) => State = {
-          case (StateDevicesRegistered(devicesRegistered), EventDeviceRegistered(persistenceId, deviceId )) =>
+          case (DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput), EventDeviceRegistered(persistenceId, deviceId )) =>
             val newDeviceIdSet: Set[String] =
               devicesRegistered + deviceId 
-            StateDevicesRegistered(newDeviceIdSet)
-          case (StateDevicesRegistered(devicesRegistered),EventDeviceUnRegistered(persistenceId, deviceId)) =>
+            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput)
+          case (DeviceGroupState(devicesRegistered,desiredTotalEnergyOutput),EventDeviceUnRegistered(persistenceId, deviceId)) =>
             val newDeviceIdSet: Set[String] =
               devicesRegistered - deviceId
-            StateDevicesRegistered(newDeviceIdSet) 
+            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput) 
+          case(DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput), EventDesiredTotalEnergyOutputChanged(newDesiredTotalEnergyOutput)) =>
+            DeviceGroupState(devicesRegistered,newDesiredTotalEnergyOutput)
         }
 
         // create the behavior
         EventSourcedBehavior[Command, Event, State](
           persistenceId,
-          emptyState = StateDevicesRegistered(Set.empty[String]),
+          emptyState = DeviceGroupState(Set.empty[String],0.0),
           commandHandler,
           eventHandler)
       }
     }
     getNewBehaviour()
   }
+
+
+     /**
+    * Sends a request asynchronously
+    *
+    * @param content the http-body 
+    * @param uri the recipient address
+    * @param method the http-method
+    * @param system the actor system that handles the request
+    * @return
+    */
+  private def sendHttpRequest(content: JsValue, uri: String, method: HttpMethod)(implicit system : ActorSystem[_]) : Future[HttpResponse] = {
+    val request = HttpRequest(
+              method = method,
+              uri = uri, 
+              entity = HttpEntity(
+                contentType = ContentTypes.`application/json`,
+                content.toString
+              )
+            )
+            val responseFuture: Future[HttpResponse] =
+              Http().singleRequest(request)
+            responseFuture
+}
+
+
 }

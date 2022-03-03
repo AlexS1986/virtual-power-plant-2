@@ -13,8 +13,8 @@
   
     <ul>
       <li>detail1</li>
-      <li>detail2</li>
-      <li>@deviceData.data</li>
+      <li><div id="host-div">@deviceData.currentHost</div></li>
+      <li><div id="charge-status-div">@{deviceData.data*100.0}</div></li>
     </ul>
     <form enctype="multipart/form-data" method="post" name="desiredChargeStatus" deviceId="@deviceId" groupId="@groupId">
       <label> Desired Charge Status [&#37;]</label>

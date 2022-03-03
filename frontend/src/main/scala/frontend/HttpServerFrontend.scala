@@ -211,8 +211,8 @@ object HttpServerFrontend {
           }
         }
       },
-      path ("vpp" / "device" / Segment / Segment ) { (vppId, deviceId) => // get particular device data in twin service
-        concat(get {
+      path("vpp" / "device" / Segment / Segment / "details") { (vppId, deviceId) =>
+        get {
           onComplete{
             val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
@@ -228,18 +228,29 @@ object HttpServerFrontend {
               }                                 
             case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
           }
+        }
+      },
+      path ("vpp" / "device" / Segment / Segment ) { (vppId, deviceId) => // get particular device data in twin service
+        concat( get {
+          onComplete{
+            val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
+            sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
+          }{                           
+            case Success(httpResponse) => complete(httpResponse)                          
+            case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
+          }
         },
-        post {
+        /*post {
             entity(as[DeviceIdentifier]) { deviceIdentifier =>
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/stop",HttpMethods.POST)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceIdentifier.deviceId+ " requested for STOP in simulator."))
           }
-        },
+        },*/
         delete {
-            entity(as[DeviceIdentifier]) { deviceIdentifier =>
-            sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/stop",HttpMethods.POST)
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceIdentifier.deviceId+ " requested for STOP in simulator."))
-          }
+            //entity(as[DeviceIdentifier]) { deviceIdentifier =>
+            sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToTwin+"/stop",HttpMethods.POST)
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for STOP in simulator."))
+          //}
         })
       },
       path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (vppId,deviceId) =>

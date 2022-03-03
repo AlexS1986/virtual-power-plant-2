@@ -68,8 +68,8 @@ class DeviceSimulator {
 
     sendStopNotificationToServer() {
         var headers = {"Content-Type" : "application/json"}
-        var data = JSON.stringify({"deviceId": this.deviceId,"groupId": this.groupId })
-        Util.sendRequestToServer("vpp/device/"+this.groupId+"/"+this.deviceId,"DELETE",data,headers)
+        //var data = JSON.stringify({"deviceId": this.deviceId,"groupId": this.groupId })
+        Util.sendRequestToServer("vpp/device/"+this.groupId+"/"+this.deviceId,"DELETE",null,headers)
         //Util.sendRequestToServer("/stop","POST",data,headers)
     }
 
