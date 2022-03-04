@@ -90,14 +90,34 @@ object HttpServerFrontend {
   final case class VppIdentifier(groupId: String)
   implicit val vppIdentifierF = jsonFormat1(VppIdentifier)
  
+  // TODO maybe in external files?
+  sealed trait Priority
+  final case object Priorities {
+    final case object High extends Priority
+    final case object Low extends Priority
+  }
   /**
     * represents current information about a device
     *
     * @param data
     * @param currentHost
     */
-  final case class DeviceData(data:Double, currentHost:String) 
-  implicit val deviceDataF = jsonFormat2(DeviceData)
+  case class DeviceData(data: Double, lastTenDeliveredEnergyReadings: List[Option[Double]], currentHost: String, priority: Priority)
+  implicit val priorityFormat = new JsonFormat[Priority] {
+    def write(x: Priority) = x match {
+      case Priorities.High => JsString("High")
+      case Priorities.Low => JsString("Low")
+      }
+    def read(value: JsValue) = value match {
+      case JsString(x) => x match {
+        case "High" => Priorities.High
+        case "Low"  => Priorities.Low
+        case _ => throw new RuntimeException(s"Unexpected string ${x} when trying to parse Priority")
+      }
+      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse Priority")
+    }
+  }
+  implicit val deviceDataFormat = jsonFormat4(DeviceData)
 
   final case class DesiredChargeStatusBody(desiredChargeStatus : Double)
   implicit val desiredChargeStatusBodyF = jsonFormat1(DesiredChargeStatusBody)

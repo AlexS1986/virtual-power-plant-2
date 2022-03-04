@@ -1,3 +1,4 @@
+@import frontend.HttpServerFrontend.Priorities._
 @import frontend.HttpServerFrontend.DeviceData
 @(groupId: String, deviceId: String, deviceData: DeviceData)
 
@@ -10,9 +11,17 @@
   </head>
   <body>
     <h1> Device details of @deviceId in group @groupId</h1>
-  
+    <p>
+      <div id="total-power-details" style="width:600px;height:250px;"></div>
+    </p>
+   
     <ul>
-      <li>detail1</li>
+      <li><div id="priority-div">@{deviceData.priority match {
+          case High => "high"
+          case Low => "low"
+        } 
+      }</div>
+      </li>
       <li><div id="host-div">@deviceData.currentHost</div></li>
       <li><div id="charge-status-div">@{deviceData.data*100.0}</div></li>
     </ul>
@@ -29,6 +38,7 @@
     <a href="/">overview</a>
 
     <script src="https://code.jquery.com/jquery-2.1.1.min.js" type="text/javascript"></script>
+    <script src="https://cdn.plot.ly/plotly-2.4.2.min.js" type="text/javascript"></script>
     <script src="/web/Util.js" type="text/javascript"></script>
     <script src="/web/details/main.js" type="text/javascript"></script>
   </body>

@@ -1,5 +1,61 @@
 $(document).ready(function () {
         'use strict';
+
+        const time = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const lastTenDeliveredEnergyReadings = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        const totalPowerDetailsHtmlElement = document.getElementById('total-power-details');
+
+
+
+        function plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement,time, lastTenDeliveredEnergyReadings) {
+            //https://plotly.com/javascript/figure-labels/
+            var layout = {
+                title: {
+                  text:'Last ten energy deposits',
+                  font: {
+                    family: 'Courier New, monospace',
+                    size: 24
+                  },
+                  xref: 'paper',
+                  x: 0.05,
+                },
+                xaxis: {
+                  title: {
+                    text: '#number',
+                    font: {
+                      family: 'Courier New, monospace',
+                      size: 18,
+                      color: '#7f7f7f'
+                    }
+                  },
+                },
+                yaxis: {
+                    title: {
+                      text: 'Energy deposited [KWh]',
+                      font: {
+                        family: 'Courier New, monospace',
+                        size: 18,
+                        color: '#7f7f7f'
+                      }
+                    }
+                  }
+                };
+
+                var trace1 = {
+                    x: time,
+                    y: lastTenDeliveredEnergyReadings,
+                    name: 'Name of Trace 1',
+                    type: 'scatter'
+                  };  
+                
+                var data = [trace1];
+
+            Plotly.newPlot( totalPowerDetailsHtmlElement, data, layout );
+        }
+
+        plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement, time,lastTenDeliveredEnergyReadings)
+
+
         const form = document.forms.namedItem("desiredChargeStatus");
 
         form.addEventListener('submit', function(ev) {
@@ -35,11 +91,17 @@ $(document).ready(function () {
                         if (this.responseText != null) {
                             var deviceDataFromServerJson = JSON.parse(this.response)
                             
-                            //set charge status in percent
-                            const data = deviceDataFromServerJson.data
                             const dataDiv = document.getElementById("charge-status-div")
-                            dataDiv.innerHTML = data*100.0
-                            console.log("Hi")
+                            dataDiv.innerHTML = deviceDataFromServerJson.data*100.0
+                            
+                            const hostDiv = document.getElementById("host-div")
+                            hostDiv.innerHTML = deviceDataFromServerJson.currentHost
+
+                            const priorityDiv = document.getElementById("priority-div")
+                            priorityDiv.innerHTML = deviceDataFromServerJson.priority
+
+                            plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement,time,deviceDataFromServerJson.lastTenDeliveredEnergyReadings)
+
                         } else alert("Communication error: No data received")
                     } else alert("Communication error: " + this.statusText)
                 }

@@ -12,6 +12,8 @@ import akka.cluster.sharding.typed.scaladsl.EntityRef
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import java.time.LocalDateTime
 
+import scala.concurrent.duration._
+
 /**
   * main entry point to provide access to functionality of DeviceGroups
   * DeviceManagers are stateless actors
@@ -56,6 +58,8 @@ object DeviceManager {
   final case class ResetPriority(deviceId: String, groupId: String) extends Command
 
   final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, currentEnergyOutput: Double) extends Command
+
+  final case class AdjustTotalEnergyOutput(groupId: String) extends Command
 
   /**
     * a message that requests to record data from hardware in the associated Device in the specified DeviceGroup
@@ -132,6 +136,12 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
         println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " " + currentEnergyOutput )
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput, currentEnergyOutput)
+        context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId))
+        this
+      case AdjustTotalEnergyOutput(groupId) => 
+        val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
+        context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId))
+        group ! DeviceGroup.AdjustTotalEnergyOutput
         this
       case ResetPriority(deviceId, groupId) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)

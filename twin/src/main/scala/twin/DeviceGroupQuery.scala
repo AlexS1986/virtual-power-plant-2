@@ -148,7 +148,7 @@ class DeviceGroupQuery(
 
   private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
-      case Device.RespondData(_,Device.DeviceState(_,Some(value),_,_),Some(currentHost)) => DeviceData(value,currentHost)
+      case Device.RespondData(_,Device.DeviceState(_,Some(currentChargeStatus),_,_,_),Some(currentHost)) => DeviceData(currentChargeStatus,currentHost)
       case _ => DataNotAvailable
     }
 

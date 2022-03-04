@@ -284,9 +284,10 @@ object DeviceGroup {
                     }
                   }
                 case DesiredTotalEnergyOutput(desiredTotalEnergyOutput, currentEnergyOutput) => 
-                  Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput)).thenRun {
+                  Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput)).thenRun { state =>
                     println("DESIRED ENERGY OUTPUT RECEIVED AT GROUP")
-                    final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
+                    
+                    /*final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
                     state => val auxActorRef = context.spawn(
                       Behaviors.receive[SendAdjustTotalEnergyOuputToGroup]((ctx, message) => 
                        
@@ -298,7 +299,7 @@ object DeviceGroup {
                           Behaviors.stopped
                         }), "auxActor"+java.util.UUID.randomUUID().toString())
                     import scala.concurrent.duration._
-                    context.scheduleOnce(2.seconds, auxActorRef,SendAdjustTotalEnergyOuputToGroup(groupId))
+                    context.scheduleOnce(2.seconds, auxActorRef,SendAdjustTotalEnergyOuputToGroup(groupId)) */
                   }
                   
                   /*println("DESIRED TOTAL ENERGY OUTPUT AT GROUP " + desiredTotalEnergyOutput + " " + currentEnergyOutput)
@@ -336,7 +337,7 @@ object DeviceGroup {
                     println("ADJUST TOTAL ENERGY OUTPUT CALLED")
 
 
-                    final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
+                    /*final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
                     val auxActorRef = context.spawn(
                       Behaviors.receive[SendAdjustTotalEnergyOuputToGroup]((ctx, message) => message match {
                         case SendAdjustTotalEnergyOuputToGroup(groupIdS) => 
@@ -347,9 +348,8 @@ object DeviceGroup {
                         }), "auxActor"+java.util.UUID.randomUUID().toString())
                     import scala.concurrent.duration._
                     context.scheduleOnce(2.seconds, auxActorRef,SendAdjustTotalEnergyOuputToGroup(groupId))
-                      
-                     
-
+                    */
+            
                     implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
                     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     def write(x: LocalDateTime) = JsString(formatter.format(x))

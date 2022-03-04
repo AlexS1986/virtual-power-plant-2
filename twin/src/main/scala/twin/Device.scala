@@ -82,7 +82,7 @@ object Device {
   final case class RespondData(
       deviceId: String,
       state: DeviceState,
-      currentHost : Option[String]
+      currentHost : Option[String] 
   )
 
   /**
@@ -124,6 +124,7 @@ object Device {
     capacity: Double,
     lastChargeStatusReading: Option[Double],
     lastDeliveredEnergyReading: Option[Double],
+    lastTenDeliveredEnergyReadings: List[Option[Double]],
     priority: Priority,
   ) extends State
 
@@ -284,7 +285,7 @@ object Device {
         val commandHandler : (State, Command) => Effect[Event, State] = { 
           (state, cmd) =>
             state match {
-              case DeviceState(capacity,lastChargeStatusReading,lastDeliveredEnergyReading, priority) =>
+              case DeviceState(capacity,lastChargeStatusReading,lastDeliveredEnergyReading, lastTenDeliveredEnergyReadings, priority) =>
                 cmd match {
                   case cmd: RecordData =>
                     recordData(persistenceId.id, cmd)
@@ -360,15 +361,17 @@ object Device {
         val eventHandler: (State, Event) => State = { (state, event) =>
           (state,event) match {
             case (s: DeviceState, e: EventDataRecorded) => 
-              DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy), s.priority)
+              // most current value is last
+              val newLastTenDeliveredEnergyReadings = (Some(e.deliveredEnergy) :: (s.lastTenDeliveredEnergyReadings drop 1 ).reverse).reverse
+              DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy),newLastTenDeliveredEnergyReadings, s.priority)
             case(s: DeviceState, e: EventChargeStatusPrioritySet) =>
-              DeviceState(s.capacity, s.lastChargeStatusReading, s.lastChargeStatusReading, e.priority)
+              DeviceState(s.capacity, s.lastChargeStatusReading, s.lastDeliveredEnergyReading, s.lastTenDeliveredEnergyReadings, e.priority)
             //case _ => DeviceState(0,None,None,false)
           }
         }
 
         // returns the behavior
-        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None,Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
       }
     }
     getNewBehaviour(groupId,deviceId,None)

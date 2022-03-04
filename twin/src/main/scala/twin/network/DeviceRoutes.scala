@@ -28,7 +28,10 @@ import twin._
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import akka.http.scaladsl.model.HttpMethod
+import twin.Device.Priorities.High
+import twin.Device.Priorities.Low
+
+/*import akka.http.scaladsl.model.HttpMethod
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
@@ -36,7 +39,7 @@ import akka.http.scaladsl.model.HttpMethods
 
 import akka.{Done, actor => classic}
 import akka.stream.ActorMaterializer
-import akka.actor.ActorRefFactory
+import akka.actor.ActorRefFactory */
 
 
 
@@ -109,8 +112,22 @@ private[twin] final class DeviceRoutes(
   implicit val groupIdentifierFormat = jsonFormat1(GroupIdentifier)
 
   // to render JSON for response
-  case class DeviceData(data:Double, currentHost:String)
-  implicit val deviceDataFormat = jsonFormat2(DeviceData)
+  case class DeviceData(data: Double, lastTenDeliveredEnergyReadings: List[Option[Double]] , currentHost: String, priority: Device.Priority)
+  implicit val priorityFormat = new JsonFormat[Device.Priority] {
+    def write(x: Device.Priority) = x match {
+      case High => JsString("High")
+      case Low => JsString("Low")
+      }
+    def read(value: JsValue) = value match {
+      case JsString(x) => x match {
+        case "High" => High
+        case "Low"  => Low
+        case _ => throw new RuntimeException(s"Unexpected string ${x} when trying to parse Priority")
+      }
+      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse Priority")
+    }
+  }
+  implicit val deviceDataFormat = jsonFormat4(DeviceData)
 
   implicit val executionContext = system.executionContext
 
@@ -261,10 +278,10 @@ private[twin] final class DeviceRoutes(
                     .map {
                       deviceResponse =>
                         deviceResponse match {
-                          case Device.RespondData(_,Device.DeviceState(_,Some(lastChargeStatusReading),_,_),Some(currentHost)) => 
-                              val dataJson = DeviceData(lastChargeStatusReading,currentHost).toJson
+                          case Device.RespondData(_,Device.DeviceState(_,Some(lastChargeStatusReading),_,lastTenDeliveredEnergyReadings,priority),Some(currentHost)) => 
+                              val dataJson = DeviceData(lastChargeStatusReading, lastTenDeliveredEnergyReadings,currentHost, priority).toJson
                               dataJson.toString
-                          case Device.RespondData(_, Device.DeviceState(_,None,_,_),_) => "{}"
+                          //case Device.RespondData(_, Device.DeviceState(_,None,_,_,_),_) => "{}"
                           case _ => "{}" 
                     }
                   }
@@ -328,7 +345,7 @@ private[twin] final class DeviceRoutes(
       },
     )
 
-    /**
+    /*/**
     * Sends a request asynchronously
     *
     * @param content the http-body 
@@ -349,5 +366,5 @@ private[twin] final class DeviceRoutes(
             val responseFuture: Future[HttpResponse] =
               Http().singleRequest(request)
             responseFuture
-  }
+  }*/
 }
