@@ -85,12 +85,12 @@ object Device {
       currentHost : Option[String] 
   )
 
-  /**
+  /** TODO REMOVE
     * a message that is sent in response to a RecordData request
     *
     * @param requestId
     */
-  final case class DataRecorded(requestId: Long)
+  //final case class DataRecorded(requestId: Long)
 
   /**
     * a request to stop the hardware associated with this Device
@@ -118,7 +118,8 @@ object Device {
     *
     * @param capacity
     * @param lastChargeStatusReading
-    * @param lastDeliveredEnergyReading
+    * @param lastDeliveredEnergyReading // TODO remove?
+    * @param lastTenDeliveredEnergyReadings,
     */
   final case class DeviceState(
     capacity: Double,

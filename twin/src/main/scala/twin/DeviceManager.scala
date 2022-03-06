@@ -57,7 +57,7 @@ object DeviceManager {
 
   final case class ResetPriority(deviceId: String, groupId: String) extends Command
 
-  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, currentEnergyOutput: Double) extends Command
+  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double) extends Command
 
   final case class AdjustTotalEnergyOutput(groupId: String) extends Command
 
@@ -86,7 +86,7 @@ object DeviceManager {
     * @param deviceId
     * @param replyTo
     */
-  final case class RequestData(
+  final case class RequestData( // TODO remove Request
       groupId: String,
       deviceId: String,
       replyTo: ActorRef[Device.RespondData]
@@ -98,7 +98,7 @@ object DeviceManager {
     * @param groupId
     * @param replyTo
     */
-  final case class RequestAllData(
+  final case class RequestAllData( 
       groupId: String,
       replyTo: ActorRef[DeviceGroup.RespondAllData]
   ) extends Command
@@ -122,7 +122,7 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case RequestUnTrackDevice(groupId, deviceId) => 
         context.log.info(s"[RequestUnTrackDevice($groupId,$deviceId) received]")
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.RequestUnTrackDevice(groupId,deviceId) // Rename everything to DeviceTerminated?
+        group ! DeviceGroup.RequestUnTrackDevice(deviceId) // Rename everything to DeviceTerminated?
         this
       case StopDevice(deviceId, groupId) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
@@ -132,10 +132,10 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.SetDesiredChargeStatus(deviceId,desiredChargeStatus)
         this
-      case DesiredTotalEnergyOutput(groupId, desiredEnergyOutput, currentEnergyOutput) => 
-        println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " " + currentEnergyOutput )
+      case DesiredTotalEnergyOutput(groupId, desiredEnergyOutput) => 
+        println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " "  )
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput, currentEnergyOutput)
+        group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput)
         context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId))
         this
       case AdjustTotalEnergyOutput(groupId) => 

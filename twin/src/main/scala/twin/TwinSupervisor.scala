@@ -88,7 +88,7 @@ class IotSupervisor(context: ActorContext[TwinSupervisor.Command], httpPort: Int
                            context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager" + "B"))
   
   // spawn http-server
-  val routes = new twin.network.DeviceRoutes(context.system, deviceManagers)
+  val routes = new twin.network.TwinRoutes(context.system, deviceManagers)
   TwinHttpServer.start(routes.devices, httpPort, context.system)
 
   override def onMessage(msg: TwinSupervisor.Command): Behavior[TwinSupervisor.Command] = {

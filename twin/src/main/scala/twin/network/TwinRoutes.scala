@@ -47,7 +47,7 @@ import akka.actor.ActorRefFactory */
 //import akka.http.scaladsl.common.EntityStreamingSupport
 
 
-private[twin] final class DeviceRoutes(
+private[twin] final class TwinRoutes(
     system: ActorSystem[_],
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
 ) {
@@ -212,7 +212,7 @@ private[twin] final class DeviceRoutes(
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
             getDeviceManager match {
-                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, 0.0) // TODO LAST VALUE IS IGNORED ANYWAY
+                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput) // TODO LAST VALUE IS IGNORED ANYWAY
                                                       complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.vppId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
                           case None => complete(StatusCodes.InternalServerError)
                         }

@@ -22,12 +22,11 @@ object DeviceGroupQuery {
 
   def apply(
       deviceIdToActor: Map[String, EntityRef[Device.Command]],
-      requestId: Long,
       requester: ActorRef[DeviceGroup.RespondAllData],
       timeout: FiniteDuration): Behavior[Command] = {
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
-        new DeviceGroupQuery(deviceIdToActor, requestId, requester, timeout, context, timers)
+        new DeviceGroupQuery(deviceIdToActor, requester, timeout, context, timers)
       }
     }
   }
@@ -61,8 +60,8 @@ object DeviceGroupQuery {
     * required to read and write objects of a type with multiple subtypes
     */
   implicit object DataReadingJsonWriter extends RootJsonFormat[DataReading] {
-    def write(DataReading : DataReading) : JsValue = {
-      DataReading match {
+    def write(dataReading: DataReading) : JsValue = {
+      dataReading match {
         case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
         case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
         //case DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
@@ -115,7 +114,6 @@ object DeviceGroupQuery {
 
 class DeviceGroupQuery(
     deviceIdToActor: Map[String, EntityRef[Device.Command]],
-    requestId: Long,
     requester: ActorRef[DeviceGroup.RespondAllData],
     timeout: FiniteDuration,
     context: ActorContext[DeviceGroupQuery.Command],
@@ -127,7 +125,7 @@ class DeviceGroupQuery(
 
   timers.startSingleTimer(CollectionTimeout, CollectionTimeout, timeout)
 
-  private val respondTemperatureAdapter = context.messageAdapter(WrappedRespondData.apply)
+  private val respondDataAdapter = context.messageAdapter(WrappedRespondData.apply)
 
   private var repliesSoFar = Map.empty[String, DataReading]
   private var stillWaiting = deviceIdToActor.keySet
@@ -136,17 +134,17 @@ class DeviceGroupQuery(
   deviceIdToActor.foreach {
     case (deviceId, device) =>
       //context.watchWith(device, DeviceTerminated(deviceId))
-      device ! Device.ReadData(respondTemperatureAdapter)
+      device ! Device.ReadData(respondDataAdapter)
   }
 
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
-      case WrappedRespondData(response) => onRespondTemperature(response)
+      case WrappedRespondData(response) => onRespondData(response)
       //case DeviceTerminated(deviceId) => onDeviceTerminated(deviceId)
       case CollectionTimeout => onCollectionTimout()
     }
 
-  private def onRespondTemperature(response: Device.RespondData): Behavior[Command] = {
+  private def onRespondData(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
       case Device.RespondData(_,Device.DeviceState(_,Some(currentChargeStatus),_,_,_),Some(currentHost)) => DeviceData(currentChargeStatus,currentHost)
       case _ => DataNotAvailable
@@ -175,7 +173,7 @@ class DeviceGroupQuery(
 
   private def respondWhenAllCollected(): Behavior[Command] = {
     if (stillWaiting.isEmpty) {
-      requester ! RespondAllData(requestId, repliesSoFar)
+      requester ! RespondAllData(repliesSoFar)
       Behaviors.stopped
     } else {
       this

@@ -45,7 +45,7 @@ import akka.http.scaladsl.model.HttpMethods
 import scala.util.Failure
 import scala.util.Success
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import twin.network.DeviceRoutes
+//import twin.network.DeviceRoutes
 
 /**
   * represents a group of Devices, i.e. digital twins of hardware. Thus, it represents a Virtual Power Plant.
@@ -63,7 +63,7 @@ object DeviceGroup {
     * @param groupId
     * @param deviceId
     */
-  final case class RequestUnTrackDevice(groupId: String, deviceId: String) extends Command
+  final case class RequestUnTrackDevice(deviceId: String) extends Command
 
   /**
     * this message requests this actor to add a member
@@ -93,7 +93,7 @@ object DeviceGroup {
     * @param requestId
     * @param data a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(requestId: Long, data: Map[String, DeviceGroupQuery.DataReading]) 
+  final case class RespondAllData(data: Map[String, DeviceGroupQuery.DataReading]) 
   
   /**
     * a message that requests to send a stop command to the hardware associated with the Device
@@ -106,7 +106,7 @@ object DeviceGroup {
 
   final case class ResetPriority(deviceId: String) extends Command
 
-  final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double, currentEnergyOutput: Double) extends Command
+  final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double) extends Command
 
   final case object AdjustTotalEnergyOutput extends Command
 
@@ -142,7 +142,7 @@ object DeviceGroup {
   /**
     * state is defined by the current members, i.e. Devices, in this group and the desired total energy output
     *
-    * @param registeredDevices the set of the PersistenceIds of the members of this group
+    * @param registeredDevices // TODO change to devicesTracked? the set of the PersistenceIds of the members of this group
     * @param desiredTotalEnergyOutput
     */
   final case class DeviceGroupState(registeredDevices: Set[String], desiredTotalEnergyOutput: Double) extends State
@@ -264,7 +264,7 @@ object DeviceGroup {
                       Effect.none.thenRun(state => ())
                     }   
                 }*/ 
-                case RequestUnTrackDevice(_, deviceId) =>
+                case RequestUnTrackDevice(deviceId) =>
                   context.log.info("Device actor for {} has been terminated", deviceId)
                   unregisterDevice(persistenceId, deviceId)
                 case StopDevice(deviceId) => // TODO set priority to high so entity is not called anymore?
@@ -283,7 +283,7 @@ object DeviceGroup {
                       device ! Device.SetDesiredChargeStatus(desiredChargeStatus, Device.Priorities.High)
                     }
                   }
-                case DesiredTotalEnergyOutput(desiredTotalEnergyOutput, currentEnergyOutput) => 
+                case DesiredTotalEnergyOutput(desiredTotalEnergyOutput) => 
                   Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput)).thenRun { state =>
                     println("DESIRED ENERGY OUTPUT RECEIVED AT GROUP")
                     
@@ -408,6 +408,7 @@ object DeviceGroup {
                                 for (dId <- devicesRegistered) {
                                   val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
                                   device ! Device.ModifyChargeStatus(-percentageChangeOfChargeStatusThisStep)
+                                  
                                 }
                               case (d,c) if (d < c) && math.abs(d-c) > 2.0 =>
                                 for (dId <- devicesRegistered) {
@@ -483,7 +484,7 @@ object DeviceGroup {
                           dId <- devicesRegistered
                         } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
                         context.spawnAnonymous(
-                        DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap, requestId = 0,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
+                        DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
                       }
                   
                    /* requestAllData match { 
