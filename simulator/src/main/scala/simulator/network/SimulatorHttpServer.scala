@@ -121,26 +121,26 @@ object SimulatorHttpServer {
     /**
       * 
       *
-      * @param uniqueDeviceId2ActorRef a collection to all DeviceSimulators run by this application
+      * @param deviceSimulatorsRegistered a collection to all DeviceSimulators run by this application
       * @return
       */
-    def getNewBehavior(uniqueDeviceId2ActorRef: Map[String, ActorRef[DeviceSimulator.Command]]): Behaviors.Receive[Command] =
+    def getNewBehavior(deviceSimulatorsRegistered: Map[String, ActorRef[DeviceSimulator.Command]]): Behaviors.Receive[Command] =
       Behaviors.receive { (context, message) =>
         message match {
           case StartSimulation(deviceId, groupId, routeToPostData,routeToPostStart,routeToPostStop) =>
             val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
-            uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
+            deviceSimulatorsRegistered.get(uniqueDeviceId) match {
               case Some(deviceSimulator) => Behaviors.same
               case None =>
                 val deviceSimulator = context.spawn(DeviceSimulator(deviceId, groupId,100, 0.5, routeToPostData,routeToPostStart,routeToPostStop),uniqueDeviceId)
-                val newUniqueDeviceId2ActorRef =
-                  uniqueDeviceId2ActorRef + (uniqueDeviceId -> deviceSimulator)
+                val newdeviceSimulatorsRegistered =
+                  deviceSimulatorsRegistered + (uniqueDeviceId -> deviceSimulator)
                 deviceSimulator ! DeviceSimulator.StartSimulation
-                getNewBehavior(newUniqueDeviceId2ActorRef)
+                getNewBehavior(newdeviceSimulatorsRegistered)
             }
           case StopSimulation(deviceId, groupId, routeToPostData) =>
             val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
-            uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
+            deviceSimulatorsRegistered.get(uniqueDeviceId) match {
               case Some(deviceSimulator) =>
                 deviceSimulator ! DeviceSimulator.StopSimulation(context.self)
                 Behaviors.same
@@ -148,11 +148,11 @@ object SimulatorHttpServer {
             }
           case ConfirmStop(dId, gId) => 
               val uniqueDeviceId = DeviceSimulator.makeEntityId(gId, dId)
-              val newUniqueDeviceId2ActorRef = uniqueDeviceId2ActorRef - uniqueDeviceId
-              getNewBehavior(newUniqueDeviceId2ActorRef)
+              val newdeviceSimulatorsRegistered = deviceSimulatorsRegistered - uniqueDeviceId
+              getNewBehavior(newdeviceSimulatorsRegistered)
           case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 
               val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
-              uniqueDeviceId2ActorRef.get(uniqueDeviceId) match {
+              deviceSimulatorsRegistered.get(uniqueDeviceId) match {
               case Some(deviceSimulator) =>
                 deviceSimulator ! DeviceSimulator.SetDesiredChargeStatus(desiredChargeStatus)
                 Behaviors.same
