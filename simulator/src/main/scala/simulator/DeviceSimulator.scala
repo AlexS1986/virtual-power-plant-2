@@ -289,7 +289,7 @@ object DeviceSimulator {
     // the new chargeStatus
     val newChargeStatus = (chargeStatus*capacity+energyStoredInLocalHardware)/capacity
 
-    println("")
+    /*println("")
     println("DeviceId GroupId:" + deviceId + " " + groupId)
     println("secondsOfDay: " + secondsOfDay)
     println("randomPart " + random)
@@ -297,7 +297,7 @@ object DeviceSimulator {
     println("localEnergyProduction: " + localEnergyProduction)
     println("energyStoredInLocalHardware: " + energyStoredInLocalHardware)
     println("energyDeposit: " + energyDeposit)
-    println("newChargeStatus: " + newChargeStatus)
+    println("newChargeStatus: " + newChargeStatus) */
 
     /**
       * report activities and status to twin
