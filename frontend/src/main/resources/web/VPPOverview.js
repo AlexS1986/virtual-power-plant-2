@@ -14,8 +14,8 @@ class VPPOverview {
         var deviceId = tmp[0]
         var groupId = tmp[1]
         var uniqueId = tmp[2]
-        this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId,groupId)
-        this.deviceSimulatorsToRender[uniqueId].sendStartNotificationToServer()
+        this.deviceSimulatorsToRender[uniqueId] = new DeviceUI(deviceId,groupId)
+        this.deviceSimulatorsToRender[uniqueId].start()
     }
 
     removeDeviceSimulator() {
@@ -24,17 +24,14 @@ class VPPOverview {
             var keyOfDeviceSimulatorToStop = keys[i]
             var deviceSimulatorToStop = this.deviceSimulatorsToRender[keyOfDeviceSimulatorToStop]
             if (deviceSimulatorToStop.getSimulationState() == "active") {
-                deviceSimulatorToStop.stopSimulation()
-                /*setTimeout(function(deviceSimulatorToStop) { // give all post Requests time to be processed then remove 
-                    deviceSimulatorToStop.sendDeleteNotificationToServer()
-                },10000,deviceSimulatorToStop)*/
+                deviceSimulatorToStop.stop()
                 break;
             }
         }           
     }
 
     createUniqueId(baseDeviceName,groupId) {
-        var uniqueId = DeviceSimulator.createDeviceIndentifier(groupId,baseDeviceName+this.currentIdAppendix)
+        var uniqueId = DeviceUI.createDeviceIndentifier(groupId,baseDeviceName+this.currentIdAppendix)
         if (uniqueId in this.deviceSimulatorsToRender) {
             this.currentIdAppendix=this.currentIdAppendix+1;
             uniqueId = this.createUniqueId(baseDeviceName,groupId)
@@ -44,36 +41,39 @@ class VPPOverview {
         }
     }
 
+    getDataFromServer() {
+        function dataFromServerHandler() { // TODO function definitions outside of loop?
+            if (this.readyState == 4) {
+                if (this.status == 200) {
+                    if (this.responseText != null) {
+                        const o = JSON.parse(this.response)
+                        const deviceDataFromServer = o
+                        const vppOverview = this.myParameters[0]
+                        vppOverview.postUpdateOfDeviceDataFromServer(deviceDataFromServer,this.myParameters[1])
+                    } else alert("Communication error: No data received")
+                } else alert("Communication error: " + this.statusText)
+            }
+        }
+        var headers = {"Content-Type" : "application/json"}
+        Util.sendRequestToServer("/vpp/default","GET",null,headers,dataFromServerHandler,[this,"default"])
+    }
+
     postUpdateOfDeviceDataFromServer(deviceDataFromServer, groupId) {
         var keys = Object.keys(deviceDataFromServer)
-        //var groupId = "default" // TODO get also in request?
         for (let i = 0; i<keys.length; i++) {
             var deviceId = keys[i]
             var device = deviceDataFromServer[deviceId]
-           
-            var uniqueId = DeviceSimulator.createDeviceIndentifier(groupId,deviceId)
-            //const isInServerDataAndIsInLocalData = uniqueId in this.deviceSimulatorsToRender
+            var uniqueId = DeviceUI.createDeviceIndentifier(groupId,deviceId)
 
             const isInServerDataAndIsInLocalDataAndRequestedToStop = (uniqueId in this.deviceSimulatorsToRender) && (this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive")
             if (isInServerDataAndIsInLocalDataAndRequestedToStop) {
-                this.deviceSimulatorsToRender[uniqueId].stopSimulation()
+                this.deviceSimulatorsToRender[uniqueId].stop()
             }
 
             const isInServerDataButIsNotInLocalData = !(uniqueId in this.deviceSimulatorsToRender)
             if(isInServerDataButIsNotInLocalData) {
-                this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId,groupId)
+                this.deviceSimulatorsToRender[uniqueId] = new DeviceUI(deviceId,groupId)
             }
-
-
-            /*if (isInServerDataAndIsInLocalData) {
-                const isInServerDataAndIsInLocalDataAndRequestedToStop = this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive"
-                if(this.deviceSimulatorsToRender[uniqueId].getSimulationState()=="passive") { // do"passive" as a field, is passive but still sends data, maybe because message was not delivered correctly
-                    this.deviceSimulatorsToRender[uniqueId].stopSimulation()
-                }
-            } else {
-                this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId,groupId)
-                // send start notification is not necessary since actor state is rendered and not DB
-            } */
 
             var dataDescription = device.description
             if(dataDescription == "temperature") {// data is availables
@@ -84,95 +84,24 @@ class VPPOverview {
                 var currentHost = device.value.currentHost
                 this.deviceSimulatorsToRender[uniqueId].setCurrentHost(currentHost)
             }
-           
         }
 
-        // passivate those DeviceSimulators that are stopped at Server
+        // passivate those DeviceUI that are stopped at Server
         for (const key of Object.keys(this.deviceSimulatorsToRender)) {
-            var parsedDeviceIdentifier = (DeviceSimulator.parseDeviceIdentifier(key))
+            var parsedDeviceIdentifier = (DeviceUI.parseDeviceIdentifier(key))
 
             const isInLocalDataButNotInServerDataAndGroupMatchesAndStopClicked = !(deviceDataFromServer.hasOwnProperty(parsedDeviceIdentifier.deviceId)) && (parsedDeviceIdentifier.groupId == groupId) && (this.deviceSimulatorsToRender[key].simulationState == "passive")
             if (isInLocalDataButNotInServerDataAndGroupMatchesAndStopClicked) { 
                 this.deviceSimulatorsToRender[key].simulationState = "noPlot"
             }
         }
-
-
-
-        
-        /*for (let i = 0; i < deviceDataFromServer.length; i++) {
-            var deviceIdTemperature = deviceDataFromServer[i]
-            var uniqueId = deviceIdTemperature.deviceId
-            if (uniqueId in this.deviceSimulatorsToRender) {
-                this.deviceSimulatorsToRender[uniqueId].setTemperature( deviceIdTemperature.temperature)
-            } else { // device in DB but not in simulator
-                let deviceId = DeviceSimulator.parseDeviceIdentifier(uniqueId,defaultGroupName).deviceId
-                let groupId = DeviceSimulator.parseDeviceIdentifier(uniqueId,defaultGroupName).groupId
-                this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId, groupId)
-                this.deviceSimulatorsToRender[uniqueId].sendStartNotificationToServer()
-            }
-        } */
     }
-
-    /*postUpdateOfDeviceDataFromServerReadside(deviceDataFromServer) {
-        for (let i = 0; i < deviceDataFromServer.length; i++) {
-            var deviceIdTemperature = deviceDataFromServer[i]
-            var uniqueId = deviceIdTemperature.deviceId
-            if (uniqueId in this.deviceSimulatorsToRender) {
-                this.deviceSimulatorsToRender[uniqueId].setTemperature( deviceIdTemperature.temperature)
-            } else { // device in DB but not in simulator
-                let deviceId = DeviceSimulator.parseDeviceIdentifier(uniqueId,defaultGroupName).deviceId
-                let groupId = DeviceSimulator.parseDeviceIdentifier(uniqueId,defaultGroupName).groupId
-                this.deviceSimulatorsToRender[uniqueId] = new DeviceSimulator(deviceId, groupId)
-                this.deviceSimulatorsToRender[uniqueId].sendStartNotificationToServer()
-            }
-        }
-    } */
 
     plot() {
-
-        //paper.project.activeLayer.removeChildren()
-        //paper.view.draw()
-
-        //this.plotDeviceDisplay()
         this.plotDeviceList()
-
-        
     }
 
-    plotDeviceDisplay() {
-        this.paper.project.activeLayer.removeChildren()
-        this.paper.view.draw()
-
-        var keys = Object.keys(this.deviceSimulatorsToRender)
-
-        var c;
-        var i = 0
-        for (var x = 25; x < 400; x += 50) {
-            if (i >= keys.length) break;
-            for (var y = 25; y < 400; y += 50) {
-                if (i >= keys.length) break;
-                var deviceSimulatorToRender = this.deviceSimulatorsToRender[keys[i]] // TODO can be null?
-                if (deviceSimulatorToRender.getSimulationState() == "active") {
-                    c = Shape.Circle(x, y, deviceSimulatorToRender.temperature / 60 * 20);
-                    c.fillColor = 'green';
-                }
-                i = i + 1
-            }
-        }
-    }
-
-    plotDeviceList() {
-        /*var keys = Object.keys(this.deviceSimulatorsToRender)
-        var deviceListAsHtml = "";
-        for (var i = 0; i < keys.length; i++) {
-            var deviceSimulatorToRender = this.deviceSimulatorsToRender[keys[i]]
-            if (deviceSimulatorToRender.getSimulationState() == "active")  {
-                deviceListAsHtml += deviceSimulatorToRender.deviceId + " " + deviceSimulatorToRender.temperature + '<br>'
-            }   
-        }
-        this.htmlToDisplayDeviceList.innerHTML = deviceListAsHtml; */
-        
+    plotDeviceList() { 
         this.tableCreate();
     
     }
@@ -193,33 +122,24 @@ class VPPOverview {
             const th = document.createElement('th')
             th.appendChild(document.createTextNode(myHeaders[i]));
             tr.appendChild(th)
-                //th.style.border = '1px solid black';
         }
-        //if(document.getElementById('deviceTable') == null) {
-            
-        //}
         
-        //const tbl = document.getElementById('deviceTable')
         var keys = Object.keys(this.deviceSimulatorsToRender)
         for (let i = 0; i < keys.length; i++) {
             var deviceSimulatorToRender = this.deviceSimulatorsToRender[keys[i]]
-            //deviceSimulatorToRender.sendStopNotificationToServer() // TODO remove
             const tr = tbl.insertRow();
             if (deviceSimulatorToRender.getSimulationState() != "noPlot")  {
                 const tdId = tr.insertCell();
                 tdId.appendChild(document.createTextNode(deviceSimulatorToRender.deviceId))
-                //tdId.style.border = '1px solid black';
+                
 
                 const tdChargeStatus = tr.insertCell();
                 const divChargeStatus = document.createElement('div')
                 divChargeStatus.setAttribute('id',deviceSimulatorToRender.deviceId)
                 divChargeStatus.setAttribute('class',"bh-batteryWidget")
-                //var myDiv = $('#'+deviceSimulatorToRender.deviceId)
                 
-                //myDiv.innerHTML = deviceSimulatorToRender.temperature
                 const batteryWidget = new BatteryWidget(divChargeStatus)
                 batteryWidget.setBatteryValue(deviceSimulatorToRender.temperature*100)
-                //divChargeStatus.appendChild(document.createTextNode(deviceSimulatorToRender.temperature))
                 tdChargeStatus.appendChild(divChargeStatus)
                 tr.appendChild(tdChargeStatus)
 
@@ -228,8 +148,7 @@ class VPPOverview {
 
                 const tdHost = tr.insertCell();
                 tdHost.appendChild(document.createTextNode(deviceSimulatorToRender.currentHost))
-                //tdId.style.border = '1px solid black';
-
+                
                 const tdDetails = tr.insertCell();
                 const detailsLink = document.createElement("a");
                 detailsLink.innerHTML = "details"
@@ -242,47 +161,11 @@ class VPPOverview {
                 
                 stopButton.device = deviceSimulatorToRender
                 stopButton.onclick = function(event) {
-                    event.currentTarget.device.stopSimulation()
+                    event.currentTarget.device.stop()
                 }
                 tdStop.appendChild(stopButton)
-
-                //var test = $('#'+deviceSimulatorToRender.deviceId).find('.batteryContainer')
-                //$('#'+deviceSimulatorToRender.deviceId).find('.batteryContainer').hide().show(0);
-            } else { // if passive try to remove
-
-                //deviceSimulatorToRender.stopSimulation() 
+            } else { // noPlot
             }  
         }
-
-        //this.htmlToDisplayDeviceList.style.display = 'none'
-        //this.htmlToDisplayDeviceList.style.display = 'block'
-
-
-       /* for (let i = 0; i < 3; i++) {
-          const tr = tbl.insertRow();
-          for (let j = 0; j < 2; j++) {
-            if (i === 2 && j === 1) {
-              break;
-            } else {
-              const td = tr.insertCell();
-              td.appendChild(document.createTextNode(`Cell I${i}/J${j}`));
-              td.style.border = '1px solid black';
-              if (i === 1 && j === 1) {
-                td.setAttribute('rowSpan', '2');
-              }
-            }
-          }
-        } */
-        //this.htmlToDisplayDeviceList.innerHTML = "";
-        //this.htmlToDisplayDeviceList.appendChild(tbl);
       }
-    
-    /*sendRandomMessageToServer() {
-        var headers = {"Content-Type" : "application/json"}
-        var data = JSON.stringify({"vppId": "default","after": "2001-10-19 10:23:54" })
-        Util.sendRequestToServer("/energy","POST",data,headers)
-    } */
-      
-
-
 }

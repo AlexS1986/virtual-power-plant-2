@@ -9,10 +9,10 @@
 <body>
   <h1>Virtual Power Plant</h1>
   <p>
-    <div id="totalPower" style="width:600px;height:250px;"></div>
-  <form enctype="multipart/form-data" method="post" name="desiredPower">
+    <div id="totalEnergyOutputPlot" style="width:600px;height:250px;"></div>
+  <form enctype="multipart/form-data" method="post" name="desiredTotalEnergyOutput">
     <label> Desired Power Output [kW]</label>
-    <input type="number" name="power" required>
+    <input type="number" name="totalEnergyOutput" required>
     <input type="submit" value="upload">
   </form>
   </p>
@@ -37,8 +37,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.15/paper-full.min.js" type="text/javascript"></script>
   <script src="https://cdn.plot.ly/plotly-2.4.2.min.js" type="text/javascript"></script> 
   <script src="web/Util.js" type="text/javascript"></script>
-  <script src="web/DeviceSimulator.js" type="text/javascript"></script>
-  <script src="web/TotalPowerBoard.js" type="text/javascript"></script>
+  <script src="web/DeviceUI.js" type="text/javascript"></script>
+  <script src="web/TotalEnergyOutputBoard.js" type="text/javascript"></script>
   <script src="web/VPPOverview.js" type="text/javascript"></script>
   <script src="web/BatteryWidget.js" type="text/javascript"></script>
   <script src="web/main.js" type="text/javascript"></script>

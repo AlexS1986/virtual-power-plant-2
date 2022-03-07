@@ -3,11 +3,9 @@ $(document).ready(function () {
 
         const time = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         const lastTenDeliveredEnergyReadings = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        const totalPowerDetailsHtmlElement = document.getElementById('total-power-details');
+        const htmlElementToPlot = document.getElementById('last-ten-energy-deposits');
 
-
-
-        function plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement,time, lastTenDeliveredEnergyReadings) {
+        function plotLastTenEnergyDeposits(htmlElementToPlot,time, lastTenDeliveredEnergyReadings) {
             //https://plotly.com/javascript/figure-labels/
             var layout = {
                 title: {
@@ -50,36 +48,29 @@ $(document).ready(function () {
                 
                 var data = [trace1];
 
-            Plotly.newPlot( totalPowerDetailsHtmlElement, data, layout );
+            Plotly.newPlot( htmlElementToPlot, data, layout );
         }
 
-        plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement, time,lastTenDeliveredEnergyReadings)
+        plotLastTenEnergyDeposits(htmlElementToPlot, time,lastTenDeliveredEnergyReadings)
 
 
         const form = document.forms.namedItem("desiredChargeStatus");
-
         form.addEventListener('submit', function(ev) {
             const desiredChargeStatus = this[0].value / 100.0
             const deviceId = this.getAttribute("deviceId")
             const groupId = this.getAttribute("groupId")
             var headers = {"Content-Type" : "application/json"}
-            //var data = JSON.stringify({"deviceId": deviceId,"groupId": groupId, "desiredChargeStatus" : desiredChargeStatus })
             var data = JSON.stringify({"desiredChargeStatus" : desiredChargeStatus })
             Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId + "/charge-status","POST",data,headers)
-            //ev.currentTarget.attachedTotalPowerBoard.updateDesiredPower(this[0].value)
-            //console.log("Desired power set to: "+this[0].value)
             ev.preventDefault()
         },false);
 
         var releaseManualControlButton = document.getElementById('release-manual-button')
-
         releaseManualControlButton.onclick = function (event) {
             const deviceId = event.currentTarget.getAttribute("deviceId")
             const groupId = event.currentTarget.getAttribute("groupId")
 
             var headers = {"Content-Type" : "application/json"}
-            //var data = JSON.stringify({"deviceId": deviceId,"groupId": groupId, "desiredChargeStatus" : desiredChargeStatus })
-            //var data = JSON.stringify({})
             Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId + "/charge-status","DELETE",null,headers)
             
         }
@@ -89,6 +80,8 @@ $(document).ready(function () {
                 if (this.readyState == 4) {
                     if (this.status == 200) {
                         if (this.responseText != null) {
+
+                            // plot device data TODO make function
                             var deviceDataFromServerJson = JSON.parse(this.response)
                             
                             const dataDiv = document.getElementById("charge-status-div")
@@ -100,7 +93,7 @@ $(document).ready(function () {
                             const priorityDiv = document.getElementById("priority-div")
                             priorityDiv.innerHTML = deviceDataFromServerJson.priority
 
-                            plotTotalPowerBoardDetails(totalPowerDetailsHtmlElement,time,deviceDataFromServerJson.lastTenDeliveredEnergyReadings)
+                            plotLastTenEnergyDeposits(htmlElementToPlot,time,deviceDataFromServerJson.lastTenDeliveredEnergyReadings)
 
                         } else alert("Communication error: No data received")
                     } else alert("Communication error: " + this.statusText)

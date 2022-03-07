@@ -42,7 +42,7 @@ import scala.util.Try
 /**
  * The http server of the frontend Microservice
  */
-object HttpServerFrontend {
+object FrontendHttpServer {
   /**
     * represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
     *
@@ -163,10 +163,10 @@ object HttpServerFrontend {
               getFromResource("web/Util.js", ContentTypes.`application/json`)
             case "VPPOverview.js" =>
               getFromResource("web/VPPOverview.js", ContentTypes.`application/json`)
-            case "TotalPowerBoard.js" =>
-              getFromResource("web/TotalPowerBoard.js", ContentTypes.`application/json`)
-            case "DeviceSimulator.js" =>
-              getFromResource("web/DeviceSimulator.js", ContentTypes.`application/json`)
+            case "TotalEnergyOutputBoard.js" =>
+              getFromResource("web/TotalEnergyOutputBoard.js", ContentTypes.`application/json`)
+            case "DeviceUI.js" =>
+              getFromResource("web/DeviceUI.js", ContentTypes.`application/json`)
             case "main.js" =>
               getFromResource("web/main.js", ContentTypes.`application/json`)
             case "main.css" =>

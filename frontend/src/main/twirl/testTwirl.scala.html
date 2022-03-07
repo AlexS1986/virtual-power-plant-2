@@ -1,5 +1,5 @@
-@import frontend.HttpServerFrontend.Priorities._
-@import frontend.HttpServerFrontend.DeviceData
+@import frontend.FrontendHttpServer.Priorities._
+@import frontend.FrontendHttpServer.DeviceData
 @(groupId: String, deviceId: String, deviceData: DeviceData)
 
 <!DOCTYPE html>
@@ -12,7 +12,7 @@
   <body>
     <h1> Device details of @deviceId in group @groupId</h1>
     <p>
-      <div id="total-power-details" style="width:600px;height:250px;"></div>
+      <div id="last-ten-energy-deposits" style="width:600px;height:250px;"></div>
     </p>
    
     <ul>
