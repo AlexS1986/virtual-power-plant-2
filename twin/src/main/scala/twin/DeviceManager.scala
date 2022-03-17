@@ -57,9 +57,9 @@ object DeviceManager {
 
   final case class ResetPriority(deviceId: String, groupId: String) extends Command
 
-  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double) extends Command
+  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, relaxationParameter: Double) extends Command
 
-  final case class AdjustTotalEnergyOutput(groupId: String) extends Command
+  final case class AdjustTotalEnergyOutput(groupId: String, relaxationParameter: Double) extends Command
 
   /**
     * a message that requests to record data from hardware in the associated Device in the specified DeviceGroup
@@ -132,15 +132,15 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.SetDesiredChargeStatus(deviceId,desiredChargeStatus)
         this
-      case DesiredTotalEnergyOutput(groupId, desiredEnergyOutput) => 
-        println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " "  )
+      case DesiredTotalEnergyOutput(groupId, desiredEnergyOutput, relaxationParameter) => 
+        println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " " + relaxationParameter)
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput)
-        context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId))
+        group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput, relaxationParameter)
+        context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId,relaxationParameter))
         this
-      case AdjustTotalEnergyOutput(groupId) => 
+      case AdjustTotalEnergyOutput(groupId, relaxationParameter) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId))
+        context.scheduleOnce(3.seconds,context.self,AdjustTotalEnergyOutput(groupId,relaxationParameter))
         group ! DeviceGroup.AdjustTotalEnergyOutput
         this
       case ResetPriority(deviceId, groupId) => 

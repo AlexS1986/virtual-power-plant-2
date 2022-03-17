@@ -8,6 +8,11 @@ class TotalEnergyOutputBoard {
         this.htmlElementToDisplay = htmlElementToDisplay
         this.attachToFormElement(htmlFormElementThatProvidesDesiredPower)
         this.vppId = vppId
+        this.relaxationParameter = 1.0
+    }
+
+    setRelaxationParameter(relaxationParameter) {
+        this.relaxationParameter = relaxationParameter
     }
 
     updateCurrentPower(currentPower)  {
@@ -57,6 +62,7 @@ class TotalEnergyOutputBoard {
         htmlFormElementThatProvidesDesiredPower.attachedTotalPowerBoard = this
         htmlFormElementThatProvidesDesiredPower.addEventListener('submit', function(ev) {
             ev.currentTarget.attachedTotalPowerBoard.updateDesiredPower(this[0].value)
+            ev.currentTarget.attachedTotalPowerBoard.setRelaxationParameter(this[1].value)
             console.log("Desired total energy Output set to: "+this[0].value)
             ev.preventDefault()
             ev.currentTarget.attachedTotalPowerBoard.sendDataToServer()
@@ -65,7 +71,7 @@ class TotalEnergyOutputBoard {
 
     sendDataToServer()  {
         var headers = {"Content-Type" : "application/json"}
-        var data = JSON.stringify({"vppId": this.vppId, "desiredEnergyOutput": parseFloat(this.desiredTotalEnergyDeposits[this.desiredTotalEnergyDeposits.length-1]), "priority": 2})
+        var data = JSON.stringify({"vppId": this.vppId, "desiredEnergyOutput": parseFloat(this.desiredTotalEnergyDeposits[this.desiredTotalEnergyDeposits.length-1]), "priority": 2, "relaxationParameter": parseFloat(this.relaxationParameter)})
         Util.sendRequestToServer("/vpp/"+this.vppId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
     }
 

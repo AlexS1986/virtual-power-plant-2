@@ -11,8 +11,10 @@
   <p>
     <div id="totalEnergyOutputPlot" style="width:600px;height:250px;"></div>
   <form enctype="multipart/form-data" method="post" name="desiredTotalEnergyOutput">
-    <label> Desired Power Output [kW]</label>
-    <input type="number" name="totalEnergyOutput" required>
+    <label> Desired Total Energy Output</label>
+    <input type="number" name="totalEnergyOutput" value=0.0 step="any" required>
+    <label>Relaxation Parameter</label>
+    <input type="number" name="relaxationParameter" value=1.0 step="any" required>
     <input type="submit" value="upload">
   </form>
   </p>

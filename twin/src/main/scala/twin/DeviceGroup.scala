@@ -106,7 +106,7 @@ object DeviceGroup {
 
   final case class ResetPriority(deviceId: String) extends Command
 
-  final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double) extends Command
+  final case class DesiredTotalEnergyOutput(desiredTotalEnergyOutput: Double, relaxationParameter: Double) extends Command
 
   final case object AdjustTotalEnergyOutput extends Command
 
@@ -145,7 +145,7 @@ object DeviceGroup {
     * @param registeredDevices // TODO change to devicesTracked? the set of the PersistenceIds of the members of this group
     * @param desiredTotalEnergyOutput
     */
-  final case class DeviceGroupState(registeredDevices: Set[String], desiredTotalEnergyOutput: Double) extends State
+  final case class DeviceGroupState(registeredDevices: Set[String], desiredTotalEnergyOutput: Double, relaxationParameter: Double) extends State
 
   /**
     * events that change the state of this actor
@@ -168,7 +168,7 @@ object DeviceGroup {
     */                                                                             
   final case class EventDeviceUnRegistered(persistenceId: String, deviceId: String) extends Event
 
-  final case class EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput:Double) extends Event
+  final case class EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput:Double, relaxationParameter:Double) extends Event
 
   /**
     * defines a type of an entity for cluster sharding
@@ -234,7 +234,7 @@ object DeviceGroup {
             */
         val commandHandler: (State, Command) => Effect[Event, State] = { (state, cmd) =>
           state match {
-            case DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput) =>
+            case DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput, relaxationParameter) =>
               cmd match {
                 //case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
                   case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
@@ -283,8 +283,8 @@ object DeviceGroup {
                       device ! Device.SetDesiredChargeStatus(desiredChargeStatus, Device.Priorities.High)
                     }
                   }
-                case DesiredTotalEnergyOutput(desiredTotalEnergyOutput) => 
-                  Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput)).thenRun { state =>
+                case DesiredTotalEnergyOutput(desiredTotalEnergyOutput, relaxationParameter) => 
+                  Effect.persist(EventDesiredTotalEnergyOutputChanged(desiredTotalEnergyOutput,relaxationParameter)).thenRun { state =>
                     println("DESIRED ENERGY OUTPUT RECEIVED AT GROUP")
                     
                     /*final case class SendAdjustTotalEnergyOuputToGroup(groupId:String)
@@ -389,12 +389,25 @@ object DeviceGroup {
                         case Success(energyDepositedResponse) =>
                           energyDepositedResponse.energyDeposited match {
                             case Some(currentEnergyOutput) => 
-                              val capacityOfDevice = 100.0
-                              val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
-                              val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
+                              //val capacityOfDevice = 100.0
+                              //val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
+                              //val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
                               
-                              val deltaEnergyOutput = desiredTotalEnergyOutput - currentEnergyOutput
+                              if(!devicesRegistered.isEmpty) {
+                                // introduce some damping
+                                //val relaxationParameter = 1.0
+                                val newEnergyOutput = (desiredTotalEnergyOutput + currentEnergyOutput*relaxationParameter) / (1.0+relaxationParameter)
+                                val deltaEnergyOutput = newEnergyOutput - currentEnergyOutput
+                                val deltaEnergyOutputPerDevice = deltaEnergyOutput /  devicesRegistered.size.toDouble //apply in five steps?
+                                
+                                for (dId <- devicesRegistered) {
+                                  val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
+                                  device ! Device.DesiredDeltaEnergyOutput(deltaEnergyOutputPerDevice)
+                                }
+                              }
                               
+
+                              /*
                               val targetTotalPercentageChangeOfChargeStatus = math.abs(desiredTotalEnergyOutput - currentEnergyOutput) / averageEnergyStoredInVpp * 100.0
                               val numberOfStepsToAchieveDesiredTotalEnergyOutput = 5.0
 
@@ -404,19 +417,19 @@ object DeviceGroup {
                               val percentageChangeOfChargeStatusThisStep = math.min(targetPercentageChangeOfChargeStatusThisStep,maxPercentageChangeOfChargeStatusPerStep)
 
                               (desiredTotalEnergyOutput, currentEnergyOutput) match {
-                              case (d,c) if (d > c) && math.abs(d-c) > 2.0 => 
+                              case (d,c) if (d > c) => //&& math.abs(d-c) > 2.0 => 
                                 for (dId <- devicesRegistered) {
                                   val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
                                   device ! Device.ModifyChargeStatus(-percentageChangeOfChargeStatusThisStep)
                                   
                                 }
-                              case (d,c) if (d < c) && math.abs(d-c) > 2.0 =>
+                              case (d,c) if (d < c) => //&& math.abs(d-c) > 2.0 =>
                                 for (dId <- devicesRegistered) {
                                   val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))
                                   device ! Device.ModifyChargeStatus(+percentageChangeOfChargeStatusThisStep)
                                 }
                               case _ => println("DID NOT DELIVER ANY MESSAGE TO DEVICE " + desiredTotalEnergyOutput + " " +currentEnergyOutput + " " + math.abs(desiredTotalEnergyOutput-currentEnergyOutput) )
-                              }
+                              } */
 
                             case None => 
                           }
@@ -508,22 +521,22 @@ object DeviceGroup {
         * processes persisted Events and may change the current State
         */
         val eventHandler: (State, Event) => State = {
-          case (DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput), EventDeviceRegistered(persistenceId, deviceId )) =>
+          case (DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput, relaxationParameter), EventDeviceRegistered(persistenceId, deviceId )) =>
             val newDeviceIdSet: Set[String] =
               devicesRegistered + deviceId 
-            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput)
-          case (DeviceGroupState(devicesRegistered,desiredTotalEnergyOutput),EventDeviceUnRegistered(persistenceId, deviceId)) =>
+            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput,relaxationParameter)
+          case (DeviceGroupState(devicesRegistered,desiredTotalEnergyOutput, relaxationParameter),EventDeviceUnRegistered(persistenceId, deviceId)) =>
             val newDeviceIdSet: Set[String] =
               devicesRegistered - deviceId
-            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput) 
-          case(DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput), EventDesiredTotalEnergyOutputChanged(newDesiredTotalEnergyOutput)) =>
-            DeviceGroupState(devicesRegistered,newDesiredTotalEnergyOutput)
+            DeviceGroupState(newDeviceIdSet, desiredTotalEnergyOutput,relaxationParameter) 
+          case(DeviceGroupState(devicesRegistered, desiredTotalEnergyOutput,relaxationParameter), EventDesiredTotalEnergyOutputChanged(newDesiredTotalEnergyOutput, newRelaxationParameter)) =>
+            DeviceGroupState(devicesRegistered,newDesiredTotalEnergyOutput,newRelaxationParameter)
         }
 
         // create the behavior
         EventSourcedBehavior[Command, Event, State](
           persistenceId,
-          emptyState = DeviceGroupState(Set.empty[String],0.0),
+          emptyState = DeviceGroupState(Set.empty[String],0.0,1.0),
           commandHandler,
           eventHandler)
       }

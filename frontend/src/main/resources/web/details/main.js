@@ -53,7 +53,7 @@ $(document).ready(function () {
 
         plotLastTenEnergyDeposits(htmlElementToPlot, time,lastTenDeliveredEnergyReadings)
 
-
+        // TODO make function setDesiredChargeStatus(desiredChargeStatus)
         const form = document.forms.namedItem("desiredChargeStatus");
         form.addEventListener('submit', function(ev) {
             const desiredChargeStatus = this[0].value / 100.0

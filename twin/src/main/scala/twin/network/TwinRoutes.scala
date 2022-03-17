@@ -68,8 +68,8 @@ private[twin] final class TwinRoutes(
   final case class StopDevice(deviceId: String, groupId: String)
   implicit val stopDeviceFormat  = jsonFormat2(StopDevice)
 
-  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int)
-  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat3(TotalDesiredEnergyOutputMessage)
+  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int, relaxationParameter: Double)
+  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat4(TotalDesiredEnergyOutputMessage)
 
   /**
       * this message is sent to this Microservice in order tell a particular Device to set its desired charge status
@@ -212,7 +212,7 @@ private[twin] final class TwinRoutes(
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
             getDeviceManager match {
-                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput) // TODO LAST VALUE IS IGNORED ANYWAY
+                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, totalDesiredEnergyOutputMessage.relaxationParameter) // TODO LAST VALUE IS IGNORED ANYWAY
                                                       complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.vppId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
                           case None => complete(StatusCodes.InternalServerError)
                         }

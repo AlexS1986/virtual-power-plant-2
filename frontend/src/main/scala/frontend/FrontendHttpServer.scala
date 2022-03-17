@@ -125,8 +125,8 @@ object FrontendHttpServer {
   final case class DesiredChargeStatusMessageBody(groupId: String, deviceId: String, desiredChargeStatus: Double)
   implicit val DesiredChargeStatusMessageBodyF = jsonFormat3(DesiredChargeStatusMessageBody)
 
-  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int)
-  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat3(TotalDesiredEnergyOutputMessage)
+  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int, relaxationParameter:Double)
+  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat4(TotalDesiredEnergyOutputMessage)
   //var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": this.desiredPowers[this.desiredPowers.length-1], "priority": 2})
 
   def main(args: Array[String]): Unit = {

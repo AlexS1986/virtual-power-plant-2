@@ -243,7 +243,7 @@ object DeviceSimulator {
   )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration, Double) = {
 
     assert( chargeStatus>= 0.0 && chargeStatus <= 1.0, "ChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + chargeStatus)
-     assert( desiredChargeStatus>= 0.0 && desiredChargeStatus <= 1.0, "DesiredChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + desiredChargeStatus)
+    assert( desiredChargeStatus>= 0.0 && desiredChargeStatus <= 1.0, "DesiredChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + desiredChargeStatus)
     // this is the desired charge status that this device should reach and can be controlled externally
     //val desiredChargeStatus = 1.0
     val desiredEnergyStoredInHardware  = (desiredChargeStatus - chargeStatus) * capacity
@@ -253,7 +253,7 @@ object DeviceSimulator {
     val secondsOfDay = now.toLocalTime().toSecondOfDay()
   
     // local energy production has a random and a periodic part that simulates renewable energy production
-    val maxAmplRandom = 0.025 * capacity
+    val maxAmplRandom = 0.01 * capacity
     val signRandom = if(math.random()>0.5) 1.0 else -1.0
     val random = math.random()*maxAmplRandom*signRandom
    

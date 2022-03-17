@@ -146,8 +146,8 @@ object SimulatorHttpServer {
                 Behaviors.same
               case None => Behaviors.same
             }
-          case ConfirmStop(dId, gId) => 
-              val uniqueDeviceId = DeviceSimulator.makeEntityId(gId, dId)
+          case ConfirmStop(deviceId, groupId) => 
+              val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
               val newdeviceSimulatorsRegistered = deviceSimulatorsRegistered - uniqueDeviceId
               getNewBehavior(newdeviceSimulatorsRegistered)
           case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 

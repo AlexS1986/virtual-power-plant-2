@@ -106,7 +106,9 @@ object Device {
 
   final case object ResetPriority extends Command
 
-  final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command
+  final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command // not needed anymore
+
+  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command
 
   /**
     * states that a device can assume
@@ -324,7 +326,7 @@ object Device {
                       case Low => Effect.none
                     }
                   
-                  case ModifyChargeStatus(percentOfCapacity) => 
+                  case ModifyChargeStatus(percentOfCapacity) => // TODO not needed anymore
                     println("MODIFY CHARGE STATUS RECEIVED AT DEVICE " + percentOfCapacity)
                     println("CURRENT DEVICE STATUS " + priority)
                     priority match {
@@ -345,6 +347,18 @@ object Device {
                         
                       }
                     }
+                  case DesiredDeltaEnergyOutput(deltaEnergyOutput) => 
+                    Effect.none.thenRun { state => lastChargeStatusReading match {
+                      case None => // cannot compute adequate desired charge status
+                      case Some(currentChargeStatus) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus
+                                                        val upperBound = 1.0
+                                                        val lowerBound = 0.0
+                                                        val desiredChargeStatus = math.min(math.max(lowerBound,-deltaEnergyOutput/capacity + currentChargeStatus),upperBound)
+                                                        implicit val system : ActorSystem[_] = context.system
+                                                        println("DESIREDENERGYOUTPUTMESSAGERECEIVED")
+                                                        HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                    }
+                  }
 
                     /*Effect.none.thenRun{
                     state => 
