@@ -146,7 +146,7 @@ class DeviceGroupQuery(
 
   private def onRespondData(response: Device.RespondData): Behavior[Command] = {
     val reading = response match {
-      case Device.RespondData(_,Device.DeviceState(_,Some(currentChargeStatus),_,_,_),Some(currentHost)) => DeviceData(currentChargeStatus,currentHost)
+      case Device.RespondData(_,Device.DeviceState(_,List(_,Some(currentChargeStatus)),_,_,_),Some(currentHost)) => DeviceData(currentChargeStatus,currentHost)
       case _ => DataNotAvailable
     }
 

@@ -106,9 +106,9 @@ object Device {
 
   final case object ResetPriority extends Command
 
-  final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command // not needed anymore
+  //final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command // not needed anymore
 
-  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command
+  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command //TODO added -> change in Documentation
 
   /**
     * states that a device can assume
@@ -125,7 +125,7 @@ object Device {
     */
   final case class DeviceState(
     capacity: Double,
-    lastChargeStatusReading: Option[Double],
+    lastTwoChargeStatusReadings: List[Option[Double]],
     lastDeliveredEnergyReading: Option[Double],
     lastTenDeliveredEnergyReadings: List[Option[Double]],
     priority: Priority,
@@ -171,7 +171,6 @@ object Device {
   final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event
 
   
-
   /**
     * defines a type of an entity for cluster sharding
     */
@@ -326,7 +325,7 @@ object Device {
                       case Low => Effect.none
                     }
                   
-                  case ModifyChargeStatus(percentOfCapacity) => // TODO not needed anymore
+                  /*case ModifyChargeStatus(percentOfCapacity) => // TODO not needed anymore
                     println("MODIFY CHARGE STATUS RECEIVED AT DEVICE " + percentOfCapacity)
                     println("CURRENT DEVICE STATUS " + priority)
                     priority match {
@@ -346,17 +345,21 @@ object Device {
                         }
                         
                       }
-                    }
+                    } */
                   case DesiredDeltaEnergyOutput(deltaEnergyOutput) => 
-                    Effect.none.thenRun { state => lastChargeStatusReading match {
-                      case None => // cannot compute adequate desired charge status
-                      case Some(currentChargeStatus) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus
+                    Effect.none.thenRun { state => (lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head) match {
+                      case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus   
+                                                        val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
+                                                        val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  // extrapolated from the past
+                                                        
                                                         val upperBound = 1.0
                                                         val lowerBound = 0.0
-                                                        val desiredChargeStatus = math.min(math.max(lowerBound,-deltaEnergyOutput/capacity + currentChargeStatus),upperBound)
+                                                        val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction //-deltaEnergyOutput/capacity + lastChargeStatus  // TODO ensure capacity is non-zero 
+                                                        val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
                                                         implicit val system : ActorSystem[_] = context.system
                                                         println("DESIREDENERGYOUTPUTMESSAGERECEIVED")
                                                         HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                      case (List(_,_),_) => // cannot compute adequate desired charge status
                     }
                   }
 
@@ -378,15 +381,16 @@ object Device {
             case (s: DeviceState, e: EventDataRecorded) => 
               // most current value is last
               val newLastTenDeliveredEnergyReadings = (Some(e.deliveredEnergy) :: (s.lastTenDeliveredEnergyReadings drop 1 ).reverse).reverse
-              DeviceState(e.capacity,Some(e.chargeStatus),Some(e.deliveredEnergy),newLastTenDeliveredEnergyReadings, s.priority)
+              val newLastTwoChargeStatusReadings = s.lastTwoChargeStatusReadings.reverse.head :: List(Some(e.chargeStatus))
+              DeviceState(e.capacity,newLastTwoChargeStatusReadings,Some(e.deliveredEnergy),newLastTenDeliveredEnergyReadings, s.priority)
             case(s: DeviceState, e: EventChargeStatusPrioritySet) =>
-              DeviceState(s.capacity, s.lastChargeStatusReading, s.lastDeliveredEnergyReading, s.lastTenDeliveredEnergyReadings, e.priority)
+              DeviceState(s.capacity, s.lastTwoChargeStatusReadings, s.lastDeliveredEnergyReading, s.lastTenDeliveredEnergyReadings, e.priority)
             //case _ => DeviceState(0,None,None,false)
           }
         }
 
         // returns the behavior
-        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,None,None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,List(None,None),None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
       }
     }
     getNewBehaviour(groupId,deviceId,None)

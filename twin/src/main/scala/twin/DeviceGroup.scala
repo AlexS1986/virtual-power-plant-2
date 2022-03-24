@@ -393,10 +393,11 @@ object DeviceGroup {
                               //val totalCapacityOfVpp = devicesRegistered.size.toDouble * capacityOfDevice
                               //val averageEnergyStoredInVpp = totalCapacityOfVpp * 0.5 // TODO Estimate can be improved
                               
-                              if(!devicesRegistered.isEmpty) {
+                              if(!devicesRegistered.isEmpty && relaxationParameter != 0.0) {
                                 // introduce some damping
                                 //val relaxationParameter = 1.0
-                                val newEnergyOutput = (desiredTotalEnergyOutput + currentEnergyOutput*relaxationParameter) / (1.0+relaxationParameter)
+                                //val newEnergyOutput = (desiredTotalEnergyOutput + currentEnergyOutput*relaxationParameter) / (1.0+relaxationParameter)
+                                val newEnergyOutput = (desiredTotalEnergyOutput-currentEnergyOutput) / relaxationParameter + currentEnergyOutput
                                 val deltaEnergyOutput = newEnergyOutput - currentEnergyOutput
                                 val deltaEnergyOutputPerDevice = deltaEnergyOutput /  devicesRegistered.size.toDouble //apply in five steps?
                                 

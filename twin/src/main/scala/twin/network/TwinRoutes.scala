@@ -278,7 +278,7 @@ private[twin] final class TwinRoutes(
                     .map {
                       deviceResponse =>
                         deviceResponse match {
-                          case Device.RespondData(_,Device.DeviceState(_,Some(lastChargeStatusReading),_,lastTenDeliveredEnergyReadings,priority),Some(currentHost)) => 
+                          case Device.RespondData(_,Device.DeviceState(_,List(_,Some(lastChargeStatusReading)),_,lastTenDeliveredEnergyReadings,priority),Some(currentHost)) => 
                               val dataJson = DeviceData(lastChargeStatusReading, lastTenDeliveredEnergyReadings,currentHost, priority).toJson
                               dataJson.toString
                           //case Device.RespondData(_, Device.DeviceState(_,None,_,_,_),_) => "{}"
