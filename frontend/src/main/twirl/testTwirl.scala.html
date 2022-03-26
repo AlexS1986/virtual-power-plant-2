@@ -14,17 +14,19 @@
     <p>
       <div id="last-ten-energy-deposits" style="width:600px;height:250px;"></div>
     </p>
-   
-    <ul>
-      <li><div id="priority-div">@{deviceData.priority match {
-          case High => "high"
-          case Low => "low"
-        } 
-      }</div>
-      </li>
-      <li><div id="host-div">@deviceData.currentHost</div></li>
-      <li><div id="charge-status-div">@{deviceData.data*100.0}</div></li>
-    </ul>
+    <p><label><em>Control priority</em></label>
+      <div id="priority-div">@{deviceData.priority match {
+      case High => "high"
+      case Low => "low"
+    } 
+  }</div></p>
+
+  <p>
+    <label><em>Current Host</em></label>
+    <div id="host-div">@deviceData.currentHost</div>
+  </p>
+
+  <p><label><em>Charge status [&#37;]</em></label><div id="charge-status-div">@{deviceData.data*100.0}</div></p>
     <form enctype="multipart/form-data" method="post" name="desiredChargeStatus" deviceId="@deviceId" groupId="@groupId">
       <label> Desired Charge Status [&#37;]</label>
       <input type="number" name="desiredChargeStatusInput" min="0" max="100" value=@{deviceData.data*100} required>

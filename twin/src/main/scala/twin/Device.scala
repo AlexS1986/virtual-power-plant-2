@@ -347,28 +347,25 @@ object Device {
                       }
                     } */
                   case DesiredDeltaEnergyOutput(deltaEnergyOutput) => 
-                    Effect.none.thenRun { state => (lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head) match {
-                      case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus   
-                                                        val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
-                                                        val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  // extrapolated from the past
-                                                        
-                                                        val upperBound = 1.0
-                                                        val lowerBound = 0.0
-                                                        val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction //-deltaEnergyOutput/capacity + lastChargeStatus  // TODO ensure capacity is non-zero 
-                                                        val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
-                                                        implicit val system : ActorSystem[_] = context.system
-                                                        println("DESIREDENERGYOUTPUTMESSAGERECEIVED")
-                                                        HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
-                      case (List(_,_),_) => // cannot compute adequate desired charge status
+                    println("PRIORTY DESIREDENERGYOUTPUTMESSAGE " + priority)
+                    priority match {
+                      case High => Effect.none
+                      case Low => Effect.none.thenRun { state => (lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head) match {
+                        case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus   
+                                                          val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
+                                                          val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  // extrapolated from the past
+                                                          
+                                                          val upperBound = 1.0
+                                                          val lowerBound = 0.0
+                                                          val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction //-deltaEnergyOutput/capacity + lastChargeStatus  // TODO ensure capacity is non-zero 
+                                                          val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
+                                                          implicit val system : ActorSystem[_] = context.system
+                                                          println("DESIREDENERGYOUTPUTMESSAGERECEIVED")
+                                                          HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                        case (List(_,_),_) => // cannot compute adequate desired charge status
                     }
                   }
-
-                    /*Effect.none.thenRun{
-                    state => 
-                      implicit val system : ActorSystem[_] = context.system
-                      HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
-                  }*/
-                  //case ReleaseManualChargeStatusControl => 
+                  }
                 }
             }
         }

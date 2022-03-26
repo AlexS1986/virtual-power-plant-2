@@ -12,7 +12,7 @@ $(document).ready(function () {
                   text:'Last ten energy deposits',
                   font: {
                     family: 'Courier New, monospace',
-                    size: 24
+                    size: 14
                   },
                   xref: 'paper',
                   x: 0.05,
@@ -22,7 +22,7 @@ $(document).ready(function () {
                     text: '#number',
                     font: {
                       family: 'Courier New, monospace',
-                      size: 18,
+                      size: 14,
                       color: '#7f7f7f'
                     }
                   },
@@ -32,7 +32,7 @@ $(document).ready(function () {
                       text: 'Energy deposited [KWh]',
                       font: {
                         family: 'Courier New, monospace',
-                        size: 18,
+                        size: 14,
                         color: '#7f7f7f'
                       }
                     }
