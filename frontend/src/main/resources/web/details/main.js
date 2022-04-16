@@ -107,6 +107,7 @@ $(document).ready(function () {
             Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId,"GET",null,headers,dataFromServerHandler)
         }
 
+        refresh()
         const intervalId = setInterval(refresh, 1 * 2000)
     }
 )

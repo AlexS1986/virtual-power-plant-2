@@ -51,5 +51,6 @@ $(document).ready(function () {
         deleteCounter = deleteCounter +1;
 
     }
+    refresh()
     const intervalId = setInterval(refresh, 1 * 2000) // interval in which the main view is refreshed
 });
