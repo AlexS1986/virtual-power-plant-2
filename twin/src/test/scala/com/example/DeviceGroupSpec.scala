@@ -1,4 +1,4 @@
-package com.example
+/*package com.example
 
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -95,4 +95,4 @@ import Device._
   }
 }
 
-}
+} */

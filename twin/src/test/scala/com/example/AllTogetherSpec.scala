@@ -1,4 +1,4 @@
-package com.example
+/*package com.example
 
 
 
@@ -47,3 +47,4 @@ class AllTogetherSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
 
 }
+*/

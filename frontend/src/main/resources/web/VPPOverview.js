@@ -76,7 +76,7 @@ class VPPOverview {
             }
 
             var dataDescription = device.description
-            if(dataDescription == "temperature") {// data is availables
+            if(dataDescription == "temperature") {// data is available
                 var dataValue = device.value.value
                 
                 this.deviceSimulatorsToRender[uniqueId].setTemperature(dataValue)
@@ -128,11 +128,12 @@ class VPPOverview {
         for (let i = 0; i < keys.length; i++) {
             var deviceSimulatorToRender = this.deviceSimulatorsToRender[keys[i]]
             const tr = tbl.insertRow();
+            tr.setAttribute("id","tr:"+deviceSimulatorToRender.deviceId)
+            tr.setAttribute("class","deviceRow")
             if (deviceSimulatorToRender.getSimulationState() != "noPlot")  {
                 const tdId = tr.insertCell();
                 tdId.appendChild(document.createTextNode(deviceSimulatorToRender.deviceId))
                 
-
                 const tdChargeStatus = tr.insertCell();
                 const divChargeStatus = document.createElement('div')
                 divChargeStatus.setAttribute('id',deviceSimulatorToRender.deviceId)
@@ -144,7 +145,7 @@ class VPPOverview {
                 tr.appendChild(tdChargeStatus)
 
                 const tdCapacity = tr.insertCell();
-                tdCapacity.appendChild(document.createTextNode("100"))
+                tdCapacity.appendChild(document.createTextNode(deviceSimulatorToRender.capacity))
 
                 const tdHost = tr.insertCell();
                 tdHost.appendChild(document.createTextNode(deviceSimulatorToRender.currentHost))
@@ -158,6 +159,8 @@ class VPPOverview {
                 const tdStop = tr.insertCell();
                 const stopButton = document.createElement("button");
                 stopButton.innerHTML = "stop"
+                stopButton.setAttribute("id","stop_"+deviceSimulatorToRender)
+                stopButton.setAttribute("class","stopButton")
                 
                 stopButton.device = deviceSimulatorToRender
                 stopButton.onclick = function(event) {

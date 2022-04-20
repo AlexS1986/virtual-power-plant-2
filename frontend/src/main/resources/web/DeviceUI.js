@@ -8,6 +8,7 @@ class DeviceUI {
         this.temperature = 0 // TODO rename as as charge status default start value
         this.currentHost = ""
         this.lastTenDeliveredEnergyReadings = []
+        this.capacity = 100
         console.log("Device created! " + this.createDeviceIndentifier())
     }
 

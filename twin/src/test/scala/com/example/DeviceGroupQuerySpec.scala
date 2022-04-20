@@ -1,4 +1,4 @@
-package com.example
+/*package com.example
 
 
 
@@ -131,3 +131,4 @@ class DeviceGroupQuerySpec extends ScalaTestWithActorTestKit with AnyWordSpecLik
 
 
 }
+*/
