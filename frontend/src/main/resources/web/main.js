@@ -8,7 +8,11 @@ $(document).ready(function () {
     var desiredTotalEnergyDeposits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     var form = document.forms.namedItem("desiredTotalEnergyOutput");
     var totalEnergyHtmlElement = document.getElementById('totalEnergyOutputPlot')
-    var totalEnergyOutputBoard = new TotalEnergyOutputBoard(depositCounter,desiredTotalEnergyDeposits,totalEnergyHtmlElement,form, defaultGroupName)
+    var htmlElementThatHoldsDesiredTotalEnergyOutput = document.getElementById('desiredTotalEnergyOutputDiv')
+    var htmlElementThatHoldsCurrentTotalEnergyOutput = document.getElementById('currentTotalEnergyOutputDiv')
+    var totalEnergyOutputBoard = new TotalEnergyOutputBoard(depositCounter,desiredTotalEnergyDeposits,
+        totalEnergyHtmlElement,form,htmlElementThatHoldsDesiredTotalEnergyOutput,
+        htmlElementThatHoldsCurrentTotalEnergyOutput, defaultGroupName)
 
     var addButton = document.getElementById('addButton')
     var removeButton = document.getElementById('removeButton')

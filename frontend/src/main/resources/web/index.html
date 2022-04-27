@@ -9,7 +9,10 @@
 <body>
   <h1>Virtual Power Plant</h1>
   <p>
-    <div id="totalEnergyOutputPlot" style="width:600px;height:250px;"></div>
+    <div id="totalEnergyOutputPlot" style="width:600px;height:250px;">
+    <div id="desiredTotalEnergyOutputDiv" hidden></div>
+    <div id="currentTotalEnergyOutputDiv" hidden></div>
+    </div>
   <form enctype="multipart/form-data" method="post" name="desiredTotalEnergyOutput">
     <label> Desired Total Energy Output</label>
     <input type="number" name="totalEnergyOutput" value=0.0 step="any" required>

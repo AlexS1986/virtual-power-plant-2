@@ -398,7 +398,7 @@ object DeviceGroup {
                                 //val relaxationParameter = 1.0
                                 //val newEnergyOutput = (desiredTotalEnergyOutput + currentEnergyOutput*relaxationParameter) / (1.0+relaxationParameter)
                                 val newEnergyOutput = (desiredTotalEnergyOutput-currentEnergyOutput) / relaxationParameter + currentEnergyOutput
-                                val deltaEnergyOutput = newEnergyOutput - currentEnergyOutput
+                                val deltaEnergyOutput = newEnergyOutput - currentEnergyOutput // TODO only Detla is needed i.e. computed Delta directly
                                 val deltaEnergyOutputPerDevice = deltaEnergyOutput /  devicesRegistered.size.toDouble //apply in five steps?
                                 
                                 for (dId <- devicesRegistered) {

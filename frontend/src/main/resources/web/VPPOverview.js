@@ -137,7 +137,7 @@ class VPPOverview {
                 const tdChargeStatus = tr.insertCell();
                 const divChargeStatus = document.createElement('div')
                 divChargeStatus.setAttribute('id',deviceSimulatorToRender.deviceId)
-                divChargeStatus.setAttribute('class',"bh-batteryWidget")
+                divChargeStatus.setAttribute('class','bh-batteryWidget')
                 
                 const batteryWidget = new BatteryWidget(divChargeStatus)
                 batteryWidget.setBatteryValue(deviceSimulatorToRender.temperature*100)
@@ -146,9 +146,15 @@ class VPPOverview {
 
                 const tdCapacity = tr.insertCell();
                 tdCapacity.appendChild(document.createTextNode(deviceSimulatorToRender.capacity))
+                /*const textNodeC = document.createTextNode(deviceSimulatorToRender.capacity)
+                textNodeC.setAttribute('class','capacityField')
+                tdCapacity.appendChild(textNodeC)*/
 
                 const tdHost = tr.insertCell();
                 tdHost.appendChild(document.createTextNode(deviceSimulatorToRender.currentHost))
+                /*const textNodeH = document.createTextNode(deviceSimulatorToRender.capacity)
+                textNodeH.setAttribute('class','hostField')
+                tdHost.appendChild(textNodeH)*/
                 
                 const tdDetails = tr.insertCell();
                 const detailsLink = document.createElement("a");
@@ -159,7 +165,7 @@ class VPPOverview {
                 const tdStop = tr.insertCell();
                 const stopButton = document.createElement("button");
                 stopButton.innerHTML = "stop"
-                stopButton.setAttribute("id","stop_"+deviceSimulatorToRender)
+                stopButton.setAttribute("id","stop_"+deviceSimulatorToRender.deviceId)
                 stopButton.setAttribute("class","stopButton")
                 
                 stopButton.device = deviceSimulatorToRender

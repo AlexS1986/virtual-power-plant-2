@@ -1,12 +1,14 @@
 "use strict"
 
 class TotalEnergyOutputBoard {
-    constructor(depositCounter,desiredTotalEnergyDeposits,htmlElementToDisplay, htmlFormElementThatProvidesDesiredPower,vppId) {
+    constructor(depositCounter,desiredTotalEnergyDeposits,htmlElementToDisplay, htmlFormElementThatProvidesDesiredPower,htmlElementThatHoldsDesiredTotalEnergyOutput,htmlElementThatHoldsCurrentTotalEnergyOutput,vppId) {
         this.depositCounter = depositCounter
         this.desiredTotalEnergyDeposits = desiredTotalEnergyDeposits
         this.currentTotalEnergyDeposits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,]
         this.htmlElementToDisplay = htmlElementToDisplay
         this.attachToFormElement(htmlFormElementThatProvidesDesiredPower)
+        this.htmlElementThatHoldsDesiredTotalEnergyOutput = htmlElementThatHoldsDesiredTotalEnergyOutput
+        this.htmlElementThatHoldsCurrentTotalEnergyOutput = htmlElementThatHoldsCurrentTotalEnergyOutput
         this.vppId = vppId
         this.relaxationParameter = 1.0
     }
@@ -20,6 +22,7 @@ class TotalEnergyOutputBoard {
             this.currentTotalEnergyDeposits[i] = this.currentTotalEnergyDeposits[i+1]
         }
         this.currentTotalEnergyDeposits[this.currentTotalEnergyDeposits.length-1] = currentPower;
+        this.htmlElementThatHoldsCurrentTotalEnergyOutput.innerHTML = currentPower
     }
 
     shiftcurrentTotalEnergyDeposits() {
@@ -34,6 +37,7 @@ class TotalEnergyOutputBoard {
             this.desiredTotalEnergyDeposits[i] = this.desiredTotalEnergyDeposits[i+1]
         }
         this.desiredTotalEnergyDeposits[this.desiredTotalEnergyDeposits.length-1] = desiredPower;
+        this.htmlElementThatHoldsDesiredTotalEnergyOutput.innerHTML = desiredPower
     }
 
     shiftdesiredTotalEnergyDeposits() {
