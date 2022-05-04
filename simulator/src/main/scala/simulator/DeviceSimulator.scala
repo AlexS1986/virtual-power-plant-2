@@ -49,11 +49,17 @@ object DeviceSimulator {
     */
   final case class StopSimulation(replyTo: ActorRef[simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop]) extends Command
 
+  /**
+    * this message is sent to this actor in order to stop the simulation of hardware
+    */
+  final case object StopSimulator extends Command
+
+  
 
   /**
     * this message is sent to this actor in order trigger a message to the associated twin. The triggered message tells the twin to stop tracking this hardware.
     */
-  final case object UntrackDeviceAtTwin extends Command
+  final case class UntrackDeviceAtTwin(replyTo: ActorRef[simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop]) extends Command
 
   /**
     * this message is sent to this actor to trigger a new simulation step
@@ -151,7 +157,13 @@ object DeviceSimulator {
       implicit val system: ActorSystem[_] = context.system
       message match {
         case StartSimulation => 
-          sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST)
+          println(s"ALERT:Track Device request sent for $deviceId")
+          implicit val executionContext = system.executionContext
+            sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST).onComplete{
+              case Success(httpResponse) =>  println(s"ALERT:Device $deviceId successfully tracked: $httpResponse")
+              case Failure(exception) => context.scheduleOnce(2.seconds, context.self,StartSimulation) // try again later
+          }
+          //sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST)
           if (!simulationRunning) {
             context.self ! RunSimulation("even")
             getNewBehavior(
@@ -170,9 +182,23 @@ object DeviceSimulator {
           }
         case StopSimulation(replyTo) => 
           // give all messages time to be processed by twin
-          context.scheduleOnce(10.seconds, context.self,UntrackDeviceAtTwin) 
-          replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId)
-          Behaviors.same
+          context.scheduleOnce(10.seconds, context.self,UntrackDeviceAtTwin(replyTo)) 
+          //replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId)
+          getNewBehavior(
+              groupId,
+              deviceId,
+              capacity,
+              chargeStatus,
+              desiredChargeStatus = chargeStatus,
+              routeToPostTemperature,
+              urlToRequestTracking,
+              urlToRequestUnTracking,
+              false // do not process any RunSimulation messages and stop sending them
+            )
+          //Behaviors.same
+        case StopSimulator =>
+          println(s"STOPSIMULATOR RECEIVED AT $deviceId")
+          Behaviors.stopped
         case SetDesiredChargeStatus(desiredChargeStatus) => 
           getNewBehavior(
               groupId,
@@ -185,16 +211,17 @@ object DeviceSimulator {
               urlToRequestUnTracking,
               true
             )
-        case UntrackDeviceAtTwin => 
-          Behaviors.stopped{ () => { 
-            implicit val executionContext = system.executionContext
+        case UntrackDeviceAtTwin(replyTo) => 
+          //println(s"UNTRACK DEVICE RECEIVED AT $deviceId")
+          implicit val executionContext = system.executionContext
             sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestUnTracking, HttpMethods.POST).onComplete{
-              case Success(httpResponse) => 
-              case Failure(exception) => context.scheduleOnce(2.seconds, context.self,UntrackDeviceAtTwin) // try again later
-            }
+              case Success(httpResponse) =>  replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId) // confirm stop after untrack has been delivered
+              case Failure(exception) => context.scheduleOnce(2.seconds, context.self,UntrackDeviceAtTwin(replyTo))
+                                          // try again later
           }
-        }
+          Behaviors.same
         case RunSimulation(parameters) => {
+          if(simulationRunning) {
           val (message, delay, newChargeStatus) =
             simulateDevice(
               groupId,
@@ -217,6 +244,9 @@ object DeviceSimulator {
               urlToRequestUnTracking,
               true
             )
+          } else {
+            Behaviors.same
+          }
           //Behaviors.same
         }
       }

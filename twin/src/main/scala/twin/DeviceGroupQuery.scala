@@ -71,11 +71,11 @@ object DeviceGroupQuery {
                                   
     def read(json : JsValue) : DataReading = {
       json.asJsObject.getFields("description") match {
-        case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match {
+        case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match { //TODO temperature
           case Seq(JsNumber(value), JsString(currentHost)) => DeviceData(value.toDouble, currentHost)
           case _ => throw new DeserializationException("Double expected.")
         }
-        case Seq(JsString(description)) if description == "temperature not available" => DataNotAvailable
+        case Seq(JsString(description)) if description == "temperature not available" => DataNotAvailable // TODO temperature
         //case Seq(JsString(description)) if description == "device not available" => DeviceNotAvailable
         case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
         case _ => throw new DeserializationException("Temperature Reading expected.")

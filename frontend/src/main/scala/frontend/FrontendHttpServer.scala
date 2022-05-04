@@ -288,6 +288,7 @@ object FrontendHttpServer {
         )
       },
       path("simulator" / Segment / Segment / "start") { (vppId,deviceId) => 
+        println(s"DEVICE ${deviceId} STARTED FRONTEND")
         post {
           sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToSimulator+"/start",HttpMethods.POST)
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for START in simulator."))

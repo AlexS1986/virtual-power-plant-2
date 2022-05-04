@@ -209,6 +209,7 @@ object DeviceGroup {
         * @return
         */
       def registerDevice(persistenceId: PersistenceId, deviceId: String, replyTo: ActorRef[RespondTrackDevice]): Effect[Event, State] = {
+        //if(deviceId == "device399") println("DEVICE399 FOUND")
         Effect.persist(EventDeviceRegistered(persistenceId.id, deviceId)).thenRun {
           state => replyTo ! RespondTrackDevice(deviceId) //DeviceManager.DeviceRegistered(deviceId)
         }
@@ -239,11 +240,11 @@ object DeviceGroup {
                 //case WrappedRequestTrackDevice(requestTrackDevice) => requestTrackDevice match {
                   case trackMsg @ RequestTrackDevice(deviceId, replyTo) =>
                     if (devicesRegistered(deviceId)) {
-                      val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
+                      //val device = sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, deviceId))
                       Effect.none.thenRun(state => replyTo ! RespondTrackDevice(deviceId)) //DeviceRegistered(deviceId))
                     } else {
                       context.log.info("Creating device actor for {}", trackMsg.deviceId)
-                      val device = sharding.entityRefFor(Device.TypeKey,Device.makeEntityId(groupId, deviceId)) 
+                      //val device = sharding.entityRefFor(Device.TypeKey,Device.makeEntityId(groupId, deviceId)) 
                       registerDevice(persistenceId, deviceId, replyTo)
                     }
                     /*case DeviceManager.RequestTrackDevice(gId, _, _) =>
@@ -497,6 +498,7 @@ object DeviceGroup {
                         val deviceId2EntityRefSnapshot =  for {
                           dId <- devicesRegistered
                         } yield { dId -> sharding.entityRefFor(Device.TypeKey, Device.makeEntityId(groupId, dId))}
+                        //println("DEVICEGROUPQUERY"+devicesRegistered.toList)
                         context.spawnAnonymous(
                         DeviceGroupQuery(deviceId2EntityRefSnapshot.toMap,requester = replyTo, FiniteDuration(3, scala.concurrent.duration.SECONDS)))
                       }

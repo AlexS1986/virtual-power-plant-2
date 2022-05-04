@@ -162,6 +162,9 @@ private[twin] final class TwinRoutes(
               implicit val timeout: Timeout = 5.seconds
               implicit val actorSystem      = system
 
+              // TODO TEST
+              //if(deviceIdentifier.deviceId == "device399") println("DEVICE399 Requested to track at http server!")
+
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager.ask(replyTo =>  DeviceManager.RequestTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId, replyTo)) // TODO: handling of response required?
                                             complete(StatusCodes.Accepted, "Device track request received")
@@ -174,7 +177,7 @@ private[twin] final class TwinRoutes(
         post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
           entity(as[DeviceIdentifier]) {
             deviceIdentifier =>
-               println("UNTRACK DEVICE RECEIVCED " + deviceIdentifier.deviceId +  " " + deviceIdentifier.groupId )
+               //println("UNTRACK DEVICE RECEIVCED " + deviceIdentifier.deviceId +  " " + deviceIdentifier.groupId )
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager ! DeviceManager.RequestUnTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId)
                                             complete(StatusCodes.Accepted, "Device untrack request received")
@@ -328,7 +331,7 @@ private[twin] final class TwinRoutes(
 
               val result = getDeviceManager match {
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
-                  DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo)) // TODO request ID? not necessary if ask syncronously which has to be done here to respond
+                  DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo)) // TODO request ID? 
                   .map {
                     import DeviceGroupQuery.DataReadingJsonWriter
                     respondData => respondData.data.toJson.toString   
