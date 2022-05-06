@@ -35,9 +35,25 @@ CREATE TABLE IF NOT EXISTS public.event_tag(
       ON DELETE CASCADE
 );
 
+
+
 --DROP TABLE IF EXISTS public.snapshot;
 
+CREATE TABLE IF NOT EXISTS public.snapshot (
+  persistence_id VARCHAR(255) NOT NULL,
+  sequence_number BIGINT NOT NULL,
+  created BIGINT NOT NULL,
 
+  snapshot_ser_id INTEGER NOT NULL,
+  snapshot_ser_manifest VARCHAR(255) NOT NULL,
+  snapshot_payload BYTEA NOT NULL,
+
+  meta_ser_id INTEGER,
+  meta_ser_manifest VARCHAR(255),
+  meta_payload BYTEA,
+
+  PRIMARY KEY(persistence_id, sequence_number)
+);
 
 --drop table if exists public.akka_projection_offset_store;
 
