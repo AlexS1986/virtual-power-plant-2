@@ -49,14 +49,6 @@ object DeviceGroupQuery {
   private final case class WrappedRespondData(response: Device.RespondData) extends Command
 
   /**
-    * this message is sent to this actor from devices that have been stopped while the query represented by this actor was processed
-    *
-    * @param deviceId
-    */
-  //private final case class DeviceTerminated(deviceId: String) extends Command
-
-
-  /**
     * required to read and write objects of a type with multiple subtypes
     */
   implicit object DataReadingJsonWriter extends RootJsonFormat[DataReading] {
@@ -64,7 +56,6 @@ object DeviceGroupQuery {
       dataReading match {
         case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
         case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
-        //case DeviceNotAvailable => JsObject("value" -> "".toJson, "description" -> "device not available".toJson)
         case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
       }
     }
@@ -100,11 +91,6 @@ object DeviceGroupQuery {
     * Data has not been reported completely yet at the Device
     */
   case object DataNotAvailable extends DataReading
-
-  /**
-    * this Device has been requested to stop before the query represented by this actor could finish
-    */
-  //case object DeviceNotAvailable extends DataReading
 
   /**
     * this Device has not responded in time
@@ -156,14 +142,6 @@ class DeviceGroupQuery(
 
     respondWhenAllCollected()
   }
-
-  /*private def onDeviceTerminated(deviceId: String): Behavior[Command] = {
-    if (stillWaiting(deviceId)) {
-      repliesSoFar += (deviceId -> DeviceNotAvailable)
-      stillWaiting -= deviceId
-    }
-    respondWhenAllCollected()
-  } */
 
   private def onCollectionTimout(): Behavior[Command] = {
     repliesSoFar ++= stillWaiting.map(deviceId => deviceId -> DeviceTimedOut)

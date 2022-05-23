@@ -5,7 +5,7 @@ kubectl config set-context --current --namespace=iot-system-1
 http_port_frontend=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
 http_port_twin=$(kubectl get service | grep "iot-system-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
 
-numberOfDevices=3000
+numberOfDevices=1000
 numberRequests=10
 timeAllowedPerRequest=2.0
 timeAllowedForUpdateToSingleDeviceRegisteredAtServer=2.0
@@ -88,28 +88,51 @@ do
             containsTimedOut=true
     fi
     
-    sleep 5s
+    sleep 1s
 done
 average=$(echo $sum/$numberRequests | node -p)
 
 
 echo "<<< Check how long it takes to record update at device >>>"
 echo " "
-currentDateTime="$(date +"%Y-%m-%d %T" )"
-updateNotRegistered=1
+sumIndividual=0.0
 
-echo $(curl -s -XPOST http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data "{\"groupId\":\"default\",\"deviceId\": \"deviceUpdateTime\", \"capacity\" : 100,\"chargeStatus\": 0.8, \"deliveredEnergy\" : 0, \"deliveredEnergyDate\":\"$currentDateTime\"}")
-START=$(date +%s.%N)
-while (( $(echo "$updateNotRegistered") ))
+for k in `seq 0 $(($numberRequests-1))`
 do
-    response=$(curl -s -XGET http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "deviceUpdateTime"}')
-    if  grep -q "0.8" <<< "$response"; then
-            END=$(date +%s.%N)
-            echo "Charge status update registered at deviceUpdateTime"
-            updateNotRegistered=0
-    fi
+    currentDateTime="$(date +"%Y-%m-%d %T" )"
+    updateNotRegistered=1
+    START=$(date +%s.%N)
+    update=$(curl -s -XPOST http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data "{\"groupId\":\"default\",\"deviceId\": \"deviceUpdateTime\", \"capacity\" : 100,\"chargeStatus\": 0.8, \"deliveredEnergy\" : 0, \"deliveredEnergyDate\":\"$currentDateTime\"}")
+    while (( $(echo "$updateNotRegistered") ))
+    do
+        response=$(curl -s -XGET http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "deviceUpdateTime"}')
+        if  grep -q "0.8" <<< "$response"; then
+                END=$(date +%s.%N)
+                echo "Charge status update registered at deviceUpdateTime"
+                updateNotRegistered=0
+        fi
+    done
+    timeUntilDeviceIsUpdated=$(echo "$END - $START" | bc |  sed 's/^\./0./')
+    sumIndividual=`echo|awk -v y1=$timeUntilDeviceIsUpdated -v y2=$sumIndividual  '{print y1+y2}'`
+
+    echo "Update time for request $k: $timeUntilDeviceIsUpdated s"
+
+    # reset
+    reset=$(curl -s -XPOST http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data "{\"groupId\":\"default\",\"deviceId\": \"deviceUpdateTime\", \"capacity\" : 100,\"chargeStatus\": 0.1, \"deliveredEnergy\" : 0, \"deliveredEnergyDate\":\"$currentDateTime\"}")
+    resetNotRegistered=1
+    while (( $(echo "$updateNotRegistered") ))
+    do
+        response=$(curl -s -XGET http://192.168.49.2:$http_port_twin/twin/data -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "deviceUpdateTime"}')
+        if  grep -q "0.1" <<< "$response"; then
+                echo "Charge status reset registered at deviceUpdateTime for request $k."
+                resetNotRegistered=0
+        fi  
+    done
+
+    sleep 1s
 done
-timeUntilDeviceIsUpdated=$(echo "$END - $START" | bc |  sed 's/^\./0./')
+
+averageIndividualUpdate=$(echo $sumIndividual/$numberRequests | node -p)
 
 
 echo "<<< Clean up after test >>>"
@@ -151,28 +174,28 @@ timeOk=false
 if (( $(echo "$timeAllowedPerRequest > $average" |bc -l) )); then
   timeOk=true
 fi
-if [[ $total && $timeOk ]]; then
+if [[ "$total" == "true" ]] && [[ "$timeOk" == "true" ]]; then
     total=true
 else
     total=false
 fi
 #echo $total
-echo "Time until a single devices update has been registered at server: $timeUntilDeviceIsUpdated""s allowed" $timeAllowedForUpdateToSingleDeviceRegisteredAtServer"s" 
+echo "Time until a single devices update has been registered at server, average over $numberRequests trials:  $averageIndividualUpdate""s allowed" $timeAllowedForUpdateToSingleDeviceRegisteredAtServer"s" 
 echo " "
 timeOkDevice=false
-if (( $(echo "$timeAllowedForUpdateToSingleDeviceRegisteredAtServer > $timeUntilDeviceIsUpdated" |bc -l) )); then
+if (( $(echo "$timeAllowedForUpdateToSingleDeviceRegisteredAtServer >  $averageIndividualUpdate" |bc -l) )); then
   timeOkDevice=true
 fi
-if [[ $total && $timeOkDevice ]]; then
+if [[ "$total" == "true" ]] && [[ "$timeOkDevice" == "true" ]]; then
     total=true
 else
     total=false
 fi
 #echo $total
 echo "<<< Checking Correctness of Server Reply>> "
-echo "Data has been found for all started devices: $allFound"
+echo "Data has been found for all started devices: $allFound. Expected true"
 echo " "
-if [[ $total && $allFound ]]; then
+if [[ "$total" == "true" ]] && [[ "$allFound" == "true" ]]; then
     total=true
 else
     total=false
@@ -194,8 +217,5 @@ then
 else
     echo "<<< TEST FAILED >>>"
 fi;
-
-
-# idea add a single device post a status and observe how long it takes to update status
 
 

@@ -20,7 +20,7 @@ spec:
       - name: twin #iot-system
         image: alexs1986/twin:latest 
         # remove for real clusters, useful for minikube
-        imagePullPolicy: Always #IfNotPresent #Always #IfNotPresent
+        imagePullPolicy: Always #IfNotPresent
         readinessProbe: # configure health checks 
           httpGet:
             path: /ready

@@ -1,9 +1,9 @@
 import { Selector } from 'testcafe';
 
-fixture`Main Page`
+fixture`Details Page - Send Command to Battery`
     .page`http://192.168.49.2:30408`;
 
-test('U2: Details page of a battery should be able to be displayed', async t => {
+test('U5: It should be possible to send commands to individual battery', async t => {
     const deviceExists = Selector(".bh-batteryWidget").exists
     
     await t.expect(deviceExists).notOk("No devices should exist before add button is clicked.")
@@ -20,17 +20,26 @@ test('U2: Details page of a battery should be able to be displayed', async t => 
 
     //navigate to details page
     await t.navigateTo(await detailsLink.getAttribute("href"))
-    //check that details are available
-    await t.expect(Selector("#host-div").count).eql(1,"A div that displays the current host should be available")
-    await t.expect(Selector("#last-ten-energy-deposits").count).eql(1,"A div that displays the last ten energy deposits should be available")
-    await t.expect(Selector("#charge-status-div").count).eql(1,"A div that displays the current charge status should be available") 
+
+    const desiredChargeStatusInput = await Selector('input').withAttribute("name","desiredChargeStatusInput")
+    const submitButton = await Selector('input').withAttribute("type","submit") 
+
+    // try to decharge battery completely
+    const before = await Selector("#charge-status-div").innerText
+    console.log("Charge status before command: " + before)
+    await t.typeText(desiredChargeStatusInput,"0", {replace: true})
+    await t.click(submitButton).wait(10000)
+    const after = await Selector("#charge-status-div").innerText
+    console.log("Charge status after command: " + after)
+    await t.expect(after).eql("0")
 
     //navigate back to main page
     await t.navigateTo(await Selector('#overview').getAttribute("href"))
     await t.wait(1000)
 
-    // stop device simulation
+    //stop device simulation
     const stopButtons = await Selector(".stopButton");
     await t 
         .click(stopButtons.nth(0))
+        .wait(5000)
 });

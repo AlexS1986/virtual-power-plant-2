@@ -1,6 +1,6 @@
 import { Selector } from 'testcafe';
 
-fixture`Main Page`
+fixture`Main Page - Obtain Status of all Batteries`
     .page`http://192.168.49.2:30408`
     .beforeEach( async t => {
         const deviceExists = Selector(".bh-batteryWidget").exists
@@ -32,6 +32,8 @@ fixture`Main Page`
             .click(stopButtons.nth(2))
             .click(stopButtons.nth(1))
             .click(stopButtons.nth(0))
+            .wait(5000)
+        await t.expect(Selector(".bh-batteryWidget").count).eql(0,"No devices should be displayed 5s after stop has been clicked")
     })
 
 test('U8: It should be possible to obtain the status of all batteries on the main page', async t => {
@@ -55,27 +57,7 @@ test('U8: It should be possible to obtain the status of all batteries on the mai
         await t.expect(stopButton.innerText).eql("stop")
 
         const tds = deviceRow.find("td")
-        await t.expect(tds.count).eql(6)
+        await t.expect(tds.count).eql(6, "Six colums should be present in overview")
 
     }
-
-    /* const relaxationParameterField = await Selector("input").withAttribute("name","relaxationParameter")
-    const desiredTotalEnergyOutputField = await Selector("input").withAttribute("name", "totalEnergyOutput") 
-    const submitButton = await Selector("input").withAttribute("type", "submit") 
-
-    // output fields 
-    const currentTotalEnergyOutputRead = await Selector("#currentTotalEnergyOutputDiv")
-    
-    const beforeTotalEnergyOutput = await currentTotalEnergyOutputRead.innerText
-    console.log("Energy output before desired energy output set " + beforeTotalEnergyOutput)
-
-    // set desired output to 0.0
-    await t.typeText(desiredTotalEnergyOutputField,"0.0", {replace: true})
-    await t.typeText(relaxationParameterField,"20", {replace: true})
-    await t.click(submitButton).wait(8000)
-
-    // check
-    console.log("Energy output after desired energy output set " + await Selector("#currentTotalEnergyOutputDiv").innerText)
-    await t.expect(await Selector("#desiredTotalEnergyOutputDiv").innerText).eql("0.0", "The desired total energy output should be set to 0.0")
-    await t.expect(Math.abs(await Selector("#currentTotalEnergyOutputDiv").innerText)).lt(Math.abs(beforeTotalEnergyOutput), "The current energy output should go to zero") */
 });

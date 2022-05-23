@@ -13,8 +13,6 @@ import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers._
 
-//import akka.stream.Materializer
-
 import spray.json._
 import spray.json.DefaultJsonProtocol._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -27,52 +25,34 @@ import scala.util.Failure
 import twin._
 
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+//import java.time.format.DateTimeFormatter
 import twin.Device.Priorities.High
 import twin.Device.Priorities.Low
 
-/*import akka.http.scaladsl.model.HttpMethod
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpMethods
-
-
-import akka.{Done, actor => classic}
-import akka.stream.ActorMaterializer
-import akka.actor.ActorRefFactory */
-
-
-
-//import akka.http.scaladsl.common.JsonEntityStreamingSupport
-//import akka.http.scaladsl.common.EntityStreamingSupport
 
 
 private[twin] final class TwinRoutes(
     system: ActorSystem[_],
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
 ) {
-
-  //implicit val system
-  
-
-  //implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
-  //EntityStreamingSupport.json()
+  import Formats.localDateTimeFormat
 
   val readsideHost = system.settings.config.getConfig("readside").getString("host")
   val readsidePort = system.settings.config.getConfig("readside").getString("port")
   val routeToReadside = "http://" + readsideHost + ":" + readsidePort  + "/twin-readside"
 
-
-  
-
-  final case class StopDevice(deviceId: String, groupId: String)
-  implicit val stopDeviceFormat  = jsonFormat2(StopDevice)
-
-  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int, relaxationParameter: Double)
-  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat4(TotalDesiredEnergyOutputMessage)
+  /**
+    * represents the body of a http-request to request a certain total energy output
+    *
+    * @param groupId the id of the DeviceGroup 
+    * @param desiredEnergyOutput the desired total energy output for the next 10s
+    * @param relaxationParameter parameter that can be used to control oscillations of the total energy output
+    */
+  final case class TotalDesiredEnergyOutputMessage(groupId: String, desiredEnergyOutput: Double, relaxationParameter: Double)
+  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat3(TotalDesiredEnergyOutputMessage)
 
   /**
-      * this message is sent to this Microservice in order tell a particular Device to set its desired charge status
+      * this message is sent to this microservice in order tell a particular Device to set its desired charge status
       *
       * @param deviceId
       * @param groupId
@@ -81,38 +61,44 @@ private[twin] final class TwinRoutes(
   final case class DesiredChargeStatusMessage(deviceId: String, groupId: String, desiredChargeStatus: Double) 
   implicit val desiredChargeStatusMessageFormat = jsonFormat3(DesiredChargeStatusMessage)
 
+  /**
+    * represents the body of a http-request that identifies a device
+    *
+    * @param deviceId
+    * @param groupId
+    */
   final case class DeviceIdentifier(deviceId: String, groupId: String)
   implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
 
   final case class RecordData(groupId: String, deviceId: String, capacity: Double, chargeStatus: Double, deliveredEnergy: Double, deliveredEnergyDate: LocalDateTime)
-  implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
-    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-    def write(x: LocalDateTime) = JsString(formatter.format(x))
-    def read(value: JsValue) = value match {
-      case JsString(x) => LocalDateTime.parse(x, formatter)
-      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
-    }
-  }
+  
   implicit val recordDataFormat = jsonFormat6(RecordData)
 
   /**
     * represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
     *
-    * @param vppId
+    * @param groupId
     * @param before
     * @param after
     */
-  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
-  implicit val energyDepositedFormat = jsonFormat3(EnergyDepositedRequest)
-
-  final case class EnergyDepositedResponse(energyDeposited : Option[Double])
-  implicit val energyDepositedResponseFormat = jsonFormat1(EnergyDepositedResponse)
-
+  
+  /**
+    * represents the body of a http-request that identifies a DeviceGroup
+    *
+    * @param groupId
+    */
   final case class GroupIdentifier(groupId: String)
   implicit val groupIdentifierFormat = jsonFormat1(GroupIdentifier)
 
-  // to render JSON for response
-  case class DeviceData(data: Double, lastTenDeliveredEnergyReadings: List[Option[Double]] , currentHost: String, priority: Device.Priority)
+  /**
+    * represents the body of a http-request that represents the current state of the device
+    *
+    * @param chargeStatus the current chargeStatus
+    * @param lastTenDeliveredEnergyReadings the last ten energy deposits to the grid
+    * @param currentHost the id of the current instance of the twin microservice hosting the Device
+    * @param priority the current priority level of messages that the Device accepts
+    */
+  case class DeviceData(chargeStatus: Double, lastTenDeliveredEnergyReadings: List[Option[Double]] , currentHost: String, priority: Device.Priority)
   implicit val priorityFormat = new JsonFormat[Device.Priority] {
     def write(x: Device.Priority) = x match {
       case High => JsString("High")
@@ -131,11 +117,16 @@ private[twin] final class TwinRoutes(
 
   implicit val executionContext = system.executionContext
 
+  /**
+    * returns an ActorReference to one of multiple DeviceManager actors
+    *
+    * @param deviceManagers
+    * @return
+    */
   private def getDeviceManager(implicit deviceManagers : Seq[ActorRef[DeviceManager.Command]] ) : Option[ActorRef[DeviceManager.Command]] = {
     if (deviceManagers.isEmpty) {
       None
     } else {
-      //println(deviceManagers((math.random() * deviceManagers.size).toInt))
       Some(deviceManagers((math.random() * deviceManagers.size).toInt))
     }
   }
@@ -151,7 +142,7 @@ private[twin] final class TwinRoutes(
           complete(StatusCodes.Accepted,HttpEntity(ContentTypes.`text/html(UTF-8)`, "Stop request received at twin microservice."))
         }
       },
-      path("twin" / "track-device") {
+      path("twin" / "track-device") { // only after "track-device" has been called, other messages to the Device are accepted
         post {
           entity(as[DeviceIdentifier]) { 
             deviceIdentifier =>
@@ -162,9 +153,6 @@ private[twin] final class TwinRoutes(
               implicit val timeout: Timeout = 5.seconds
               implicit val actorSystem      = system
 
-              // TODO TEST
-              //if(deviceIdentifier.deviceId == "device399") println("DEVICE399 Requested to track at http server!")
-
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager.ask(replyTo =>  DeviceManager.RequestTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId, replyTo)) // TODO: handling of response required?
                                             complete(StatusCodes.Accepted, "Device track request received")
@@ -174,10 +162,9 @@ private[twin] final class TwinRoutes(
         }
       },
       path("twin" / "untrack-device") {
-        post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
+        post { 
           entity(as[DeviceIdentifier]) {
             deviceIdentifier =>
-               //println("UNTRACK DEVICE RECEIVCED " + deviceIdentifier.deviceId +  " " + deviceIdentifier.groupId )
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager ! DeviceManager.RequestUnTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId)
                                             complete(StatusCodes.Accepted, "Device untrack request received")
@@ -187,7 +174,6 @@ private[twin] final class TwinRoutes(
         }
       },
       path("twin" / "charge-status" / "priority" / "reset") {
-        //println("CHARGE STATUS RESET RECEIVED")
         post {
           entity(as[DeviceIdentifier]) { 
               deviceIdentifier =>
@@ -200,7 +186,7 @@ private[twin] final class TwinRoutes(
         } 
       },
       path("twin" / "charge-status") {
-          post { // TODO stop tracking a device as a twin, is sent by simulator (may be send synchronously?)
+          post { 
             entity(as[DesiredChargeStatusMessage]) { 
               desiredChargeStatusMessage =>
                 getDeviceManager match {
@@ -215,49 +201,10 @@ private[twin] final class TwinRoutes(
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
             getDeviceManager match {
-                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, totalDesiredEnergyOutputMessage.relaxationParameter) // TODO LAST VALUE IS IGNORED ANYWAY
-                                                      complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.vppId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
+                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.groupId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, totalDesiredEnergyOutputMessage.relaxationParameter)
+                                                      complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.groupId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
                           case None => complete(StatusCodes.InternalServerError)
-                        }
-            /*
-            onComplete {
-              val now = LocalDateTime.now()
-              val before = now.minusSeconds(2)
-              val after = now.minusSeconds(12)
-              implicit val actorSystem = system
-              sendHttpRequest(EnergyDepositedRequest(totalDesiredEnergyOutputMessage.vppId,before,after).toJson,routeToReadside+"/energies",HttpMethods.GET)
-            }{
-              case Success(httpResponse) => onComplete {
-
-                // TODO messy
-                import akka.http.scaladsl.unmarshalling.Unmarshal
-                import akka.actor.typed.scaladsl.adapter._
-
-                val classicSystem: classic.ActorSystem = system.toClassic
-                //import classicSystem.dispatcher
-
-                implicit val actorRefFactory : ActorRefFactory = classicSystem
-                implicit val materializer = ActorMaterializer() // https://stackoverflow.com/questions/36888253/play-2-5-what-is-akka-stream-materializer-useful-for
-                
-                val energyDepositedResponseF : Future[EnergyDepositedResponse] = Unmarshal(httpResponse).to[EnergyDepositedResponse]
-                energyDepositedResponseF
-
-                //val deviceDataF = Unmarshal(httpResponse).to[DeviceData]
-                //deviceDataF
-                //Future.successful(1.0)
-              } {
-                case Success(energyDepositedResponse) => energyDepositedResponse.energyDeposited match {
-                    case Some(energyDepositedValue) => getDeviceManager match {
-                          case Some(deviceManager) => deviceManager ! DeviceManager.DesiredTotalEnergyOutput(totalDesiredEnergyOutputMessage.vppId,totalDesiredEnergyOutputMessage.desiredEnergyOutput, energyDepositedValue)
-                                                      complete(StatusCodes.OK, s"Desired total energy output message received for VPP ${totalDesiredEnergyOutputMessage.vppId} for value ${totalDesiredEnergyOutputMessage.desiredEnergyOutput}")
-                          case None => complete(StatusCodes.InternalServerError)
-                        }
-                    case None => complete(StatusCodes.OK, "Cannot handle request at the moment")
-                  }
-                case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
-              }
-              case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
-            } */            
+                        }          
           }
         }
       },
@@ -275,7 +222,7 @@ private[twin] final class TwinRoutes(
 
                 val result = getDeviceManager match {
                   case Some(deviceManager) => 
-                    deviceManager//networkActor
+                    deviceManager
                       .ask((replyTo: ActorRef[Device.RespondData]) =>
                           DeviceManager.RequestData(deviceIdentifier.groupId, deviceIdentifier.deviceId, replyTo))
                     .map {
@@ -284,7 +231,6 @@ private[twin] final class TwinRoutes(
                           case Device.RespondData(_,Device.DeviceState(_,List(_,Some(lastChargeStatusReading)),_,lastTenDeliveredEnergyReadings,priority),Some(currentHost)) => 
                               val dataJson = DeviceData(lastChargeStatusReading, lastTenDeliveredEnergyReadings,currentHost, priority).toJson
                               dataJson.toString
-                          //case Device.RespondData(_, Device.DeviceState(_,None,_,_,_),_) => "{}"
                           case _ => "{}" 
                     }
                   }
@@ -299,7 +245,7 @@ private[twin] final class TwinRoutes(
               }
             }
           },
-          post { // TODO does not need to use ask pattern?
+          post {
             entity((as[RecordData])) { recordDataRequest =>
               getDeviceManager match {
                 case Some(deviceManager) => deviceManager ! DeviceManager
@@ -331,7 +277,7 @@ private[twin] final class TwinRoutes(
 
               val result = getDeviceManager match {
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
-                  DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo)) // TODO request ID? 
+                  DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo))  
                   .map {
                     import DeviceGroupQuery.DataReadingJsonWriter
                     respondData => respondData.data.toJson.toString   
@@ -347,27 +293,4 @@ private[twin] final class TwinRoutes(
         }
       },
     )
-
-    /*/**
-    * Sends a request asynchronously
-    *
-    * @param content the http-body 
-    * @param uri the recipient address
-    * @param method the http-method
-    * @param system the actor system that handles the request
-    * @return
-    */
-  private def sendHttpRequest(content:JsValue,uri:String,method:HttpMethod)(implicit system : ActorSystem[_]) : Future[HttpResponse] = {
-    val request = HttpRequest(
-              method = method,
-              uri = uri, 
-              entity = HttpEntity(
-                contentType = ContentTypes.`application/json`,
-                content.toString
-              )
-            )
-            val responseFuture: Future[HttpResponse] =
-              Http().singleRequest(request)
-            responseFuture
-  }*/
 }

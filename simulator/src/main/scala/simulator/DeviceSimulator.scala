@@ -182,7 +182,8 @@ object DeviceSimulator {
           }
         case StopSimulation(replyTo) => 
           // give all messages time to be processed by twin
-          context.scheduleOnce(10.seconds, context.self,UntrackDeviceAtTwin(replyTo)) 
+          //context.scheduleOnce(1.seconds, context.self,UntrackDeviceAtTwin(replyTo)) 
+          context.self ! UntrackDeviceAtTwin(replyTo)
           //replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId)
           getNewBehavior(
               groupId,
@@ -212,7 +213,6 @@ object DeviceSimulator {
               true
             )
         case UntrackDeviceAtTwin(replyTo) => 
-          //println(s"UNTRACK DEVICE RECEIVED AT $deviceId")
           implicit val executionContext = system.executionContext
             sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestUnTracking, HttpMethods.POST).onComplete{
               case Success(httpResponse) =>  replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId) // confirm stop after untrack has been delivered

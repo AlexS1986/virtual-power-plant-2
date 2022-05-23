@@ -125,8 +125,8 @@ object FrontendHttpServer {
   final case class DesiredChargeStatusMessageBody(groupId: String, deviceId: String, desiredChargeStatus: Double)
   implicit val DesiredChargeStatusMessageBodyF = jsonFormat3(DesiredChargeStatusMessageBody)
 
-  final case class TotalDesiredEnergyOutputMessage(vppId: String, desiredEnergyOutput: Double, priority: Int, relaxationParameter:Double)
-  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat4(TotalDesiredEnergyOutputMessage)
+  final case class TotalDesiredEnergyOutputMessage(groupId: String, desiredEnergyOutput: Double, relaxationParameter:Double)
+  implicit val TotalDesiredEnergyOutputMessageF = jsonFormat3(TotalDesiredEnergyOutputMessage)
   //var data = JSON.stringify({"vppId": vppId, "desiredEnergyOutput": this.desiredPowers[this.desiredPowers.length-1], "priority": 2})
 
   def main(args: Array[String]): Unit = {
@@ -288,7 +288,6 @@ object FrontendHttpServer {
         )
       },
       path("simulator" / Segment / Segment / "start") { (vppId,deviceId) => 
-        println(s"DEVICE ${deviceId} STARTED FRONTEND")
         post {
           sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToSimulator+"/start",HttpMethods.POST)
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for START in simulator."))

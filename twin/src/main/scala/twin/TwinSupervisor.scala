@@ -67,21 +67,20 @@ object TwinSupervisor {
       ScalikeJdbcSetup.init(context.system) 
     
       // akka projection and access to database
-      val deviceTemperatureRepository = new DeviceRepositoryImpl() // connection to database
+      val deviceDataRepository = new DeviceRepositoryImpl() // connection to database
       
       // initioalize projection
-      DeviceProjection.init(context.system,deviceTemperatureRepository)
+      DeviceProjection.init(context.system,deviceDataRepository)
 
       // create user guardian
-      new IotSupervisor(context, httpPort)
+      new TwinSupervisor(context, httpPort)
     })
   }
 
 }
 
-class IotSupervisor(context: ActorContext[TwinSupervisor.Command], httpPort: Int)
+class TwinSupervisor(context: ActorContext[TwinSupervisor.Command], httpPort: Int)
     extends AbstractBehavior[TwinSupervisor.Command](context) {
-  context.log.info("Twin Microservice started")
 
   // spawn DeviceManager actors that provice access to application
   val deviceManagers = Seq(context.spawn[DeviceManager.Command](DeviceManager(), "DeviceManager" + "A"),
@@ -90,6 +89,8 @@ class IotSupervisor(context: ActorContext[TwinSupervisor.Command], httpPort: Int
   // spawn http-server
   val routes = new twin.network.TwinRoutes(context.system, deviceManagers)
   TwinHttpServer.start(routes.devices, httpPort, context.system)
+
+  context.log.info("Twin Microservice started")
 
   override def onMessage(msg: TwinSupervisor.Command): Behavior[TwinSupervisor.Command] = {
     // No need to handle any messages since supervisor just spawns other actors and server

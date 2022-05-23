@@ -60,6 +60,13 @@ time_pretransfer="$(echo "$time_pretransfer" | sed 's/,/./;')"
 
 timeAtServerThisRequestBeforeK8sNoticesFailure=`echo|awk -v a1=$time_starttransfer -v a2=$time_pretransfer '{print a1-a2}'`
 
+# check if all device twins are moved to other twin instances
+if [[ $response != *"$firstPod"* ]];then
+    serverResponseContainsStoppedPodAsHost=false
+else 
+    serverResponseContainsStoppedPodAsHost=true
+fi
+
 # check if Kubernetes displays an error for the pod
 echo "<<< Waiting for error message >>>"
 
@@ -99,12 +106,7 @@ if (( $(echo "$timeAllowedPerRequest > $timeAtServerThisRequestAfterK8sNoticesFa
 fi
 
 
-# check if all device twins are moved to other twin instances
-if [[ $response != *"$firstPod"* ]];then
-    serverResponseContainsStoppedPodAsHost=false
-else 
-    serverResponseContainsStoppedPodAsHost=true
-fi
+
 
 # check if pod has been restarted and is running again after a while
 #sleep 10s #1.5m

@@ -40,7 +40,7 @@ do
 done
 currentCPULoadStart=$currentCPULoad
 
-sleep 1m
+sleep 30s
 
 # check if new replica has been created and devices have been moved to all replicas
 numberTwinPods=$(kubectl get pod | grep -c 'twin-[[:alnum:]]\{9\}-[[:alnum:]]\{5\}')
@@ -49,7 +49,7 @@ if [[ "$numberTwinPods" -eq 3 ]]; then
     numberTwinPodsIsThreeAfterTargetCPULoadIsExceeded=true
 fi
 echo $numberTwinPodsIsThreeAfterTargetCPULoadIsExceeded
-echo "<<< Number of twin replicas is now $numberTwinPods. Expected 3.>>>"
+echo "<<< Number of twin replicas is now $numberTwinPods. Expected 3. >>>"
 
 firstPod=$(kubectl get pod | grep -o "twin-[[:alnum:]]\{9\}-[[:alnum:]]\{5\}" | sed -n '1p')
 secondPod=$(kubectl get pod | grep -o 'twin-[[:alnum:]]\{9\}-[[:alnum:]]\{5\}' | sed -n '2p')
@@ -124,14 +124,14 @@ loadStartOk=false
 if (( $(echo "$currentCPULoad > $targetCPULoad" |bc -l) )); then
   loadStartOk=true
 fi
-if [[ $total && $loadStartOk ]]; then
+if [[ "$total" == "true" ]] && [[ "$loadStartOk" == "true" ]]; then
     total=true
 else
     total=false
 fi
 echo "Number of twin replicas is increased after target CPU load is exceeded: $numberTwinPodsIsThreeAfterTargetCPULoadIsExceeded. Expected true."
 echo " "
-if [[ $total && $numberTwinPodsIsThreeAfterTargetCPULoadIsExceeded ]]; then
+if [[ "$total" == "true" ]] && [[ "$numberTwinPodsIsThreeAfterTargetCPULoadIsExceeded" == "true" ]]; then
     total=true
 else
     total=false
@@ -139,7 +139,7 @@ fi
 echo $total
 echo "First pod has devices scaling up: $firstPodHasDevices. Expected true"
 echo " "
-if [[ $total && $firstPodHasDevices ]]; then
+if [[ "$total" == "true" ]] && [[ "$firstPodHasDevices" == "true" ]]; then
     total=true
 else
     total=false
@@ -147,7 +147,7 @@ fi
 echo $total
 echo "Second pod has devices scaling up: $secondPodHasDevices. Expected true"
 echo " "
-if [[ $total && $secondPodHasDevices ]]; then
+if [[ "$total" == "true" ]] && [[ "$secondPodHasDevices" == "true" ]]; then
     total=true
 else
     total=false
@@ -155,7 +155,7 @@ fi
 echo $total
 echo "Third pod has devices after scaling up: $thirdPodHasDevices. Expected true"
 echo " "
-if [[ $total && $thirdPodHasDevices ]]; then
+if [[ "$total" == "true" ]] && [[ "$thirdPodHasDevices" == "true" ]]; then
     total=true
 else
     total=false
@@ -163,7 +163,7 @@ fi
 echo $total
 echo "Number of twin replicas is decreased after current CPU load has fallen below target CPU: $numberTwinPodsIsTwoAfterDecreasedLoad. Expected true."
 echo " "
-if [[ $total && $numberTwinPodsIsTwoAfterDecreasedLoad ]]; then
+if [[ "$total" == "true" ]] && [[ "$numberTwinPodsIsTwoAfterDecreasedLoad" == "true" ]]; then
     total=true
 else
     total=false

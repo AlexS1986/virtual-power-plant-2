@@ -53,12 +53,35 @@ object DeviceManager {
     */
   final case class StopDevice(deviceId: String, groupId: String) extends Command
 
+  /**
+    * sets the desired charge status at a specific Device
+    *
+    * @param deviceId
+    * @param groupId
+    * @param desiredChargeStatus
+    */
   final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command
 
+  /**
+    * resets the priority of accepted messages for a specific Device to the lowest level
+    *
+    * @param deviceId
+    * @param groupId
+    */
   final case class ResetPriority(deviceId: String, groupId: String) extends Command
 
+  /**
+    * sets the desired total energy output and relaxation parameter for this DeviceGroup
+    *
+    * @param groupId
+    * @param desiredEnergyOutput
+    * @param relaxationParameter
+    */
   final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, relaxationParameter: Double) extends Command
 
+  /**
+    * requests to adjust the total energy output to the desired value
+    */
   final case class AdjustTotalEnergyOutput(groupId: String, relaxationParameter: Double) extends Command
 
   /**
@@ -133,7 +156,6 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
         group ! DeviceGroup.SetDesiredChargeStatus(deviceId,desiredChargeStatus)
         this
       case DesiredTotalEnergyOutput(groupId, desiredEnergyOutput, relaxationParameter) => 
-        println("DEVICEMANAGER DESIRED TOTAL ENERGY OUTPUT " + desiredEnergyOutput + " " + relaxationParameter)
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
         group ! DeviceGroup.DesiredTotalEnergyOutput(desiredEnergyOutput, relaxationParameter)
         context.scheduleOnce(2.seconds,context.self,AdjustTotalEnergyOutput(groupId,relaxationParameter))

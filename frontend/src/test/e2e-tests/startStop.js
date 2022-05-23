@@ -1,6 +1,6 @@
 import { Selector } from 'testcafe';
 
-fixture`Main Page`
+fixture`Main Page - Starting and Stopping Devices`
     .page`http://192.168.49.2:30408`;
 
 test('U1-U3: A battery should be able to be started and stopped', async t => {

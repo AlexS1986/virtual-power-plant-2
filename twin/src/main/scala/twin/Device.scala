@@ -33,6 +33,8 @@ import scala.util.Success
 import twin.Device.Priorities.High
 import twin.Device.Priorities.Low
 
+import akka.persistence.typed.scaladsl.RetentionCriteria
+
 
 /** represents the digital twin of a device
   * 
@@ -85,13 +87,6 @@ object Device {
       currentHost : Option[String] 
   )
 
-  /** TODO REMOVE
-    * a message that is sent in response to a RecordData request
-    *
-    * @param requestId
-    */
-  //final case class DataRecorded(requestId: Long)
-
   /**
     * a request to stop the hardware associated with this Device
     */
@@ -106,9 +101,7 @@ object Device {
 
   final case object ResetPriority extends Command
 
-  //final case class ModifyChargeStatus(percentOfCapacity: Double) extends Command // not needed anymore
-
-  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command //TODO added -> change in Documentation
+  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command
 
   /**
     * states that a device can assume
@@ -153,8 +146,11 @@ object Device {
     deliveredEnergyDate: LocalDateTime,
   ) extends Event
 
+  /** 
+    * determines which messages the Device will accept and process
+    */
   sealed trait Priority {
-    def > (o:Priority) : Boolean = {
+    def > (o: Priority) : Boolean = {
       this match {
         case Priorities.High => if(o == Priorities.Low) true else false 
         case Priorities.Low => false
@@ -162,12 +158,17 @@ object Device {
     }
   }
   
-  // TODO check if that is good style
   final case object Priorities {
     final case object High extends Priority 
     final case object Low extends Priority
   }
   
+  /**
+    * triggered if the priority level is changed
+    *
+    * @param persistenceId
+    * @param priority
+    */
   final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event
 
   
@@ -301,10 +302,8 @@ object Device {
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
                   }
                   case SetDesiredChargeStatus(desiredChargeStatus, priorityOfMessage) => 
-                    println("SET DESIRED CHARGE STATUS MESSAGE RECEIVED AT DEVICE " + s"${priorityOfMessage} ${priority}" )
                     priorityOfMessage match {
                       case pm if pm > priority => 
-                         println("SET DESIRED CHARGE STATUS MESSAGE RECEIVED AT DEVICE UNPACKED " + s"${pm}  > ${priority} ?" )
                         Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,pm)).thenRun{
                           state : State => 
                           implicit val system : ActorSystem[_] = context.system
@@ -319,50 +318,25 @@ object Device {
                       case pm => Effect.none
                     }
                   case ResetPriority => 
-                    println("CHARGE STATUS RESET RECEIVED AT DEVICE " + priority)
                     priority match {
                       case High => Effect.persist(EventChargeStatusPrioritySet(persistenceId.id,Low))
                       case Low => Effect.none
                     }
-                  
-                  /*case ModifyChargeStatus(percentOfCapacity) => // TODO not needed anymore
-                    println("MODIFY CHARGE STATUS RECEIVED AT DEVICE " + percentOfCapacity)
-                    println("CURRENT DEVICE STATUS " + priority)
-                    priority match {
-                      case High => Effect.none
-                      case Low => Effect.none.thenRun{ state =>
-                        println("LAST CHARGE STATUS READING" + lastChargeStatusReading)
-                        lastChargeStatusReading match {
-                          case Some(currentChargeStatus) => 
-                            println("LAST CHARGE STATUS READING UNPACKED" + currentChargeStatus)
-                            implicit val system : ActorSystem[_] = context.system
-                            import math._
-                            val upperBound = 1.0
-                            val lowerBound = 0.0
-                            val desiredChargeStatusOfDevice = math.min(math.max(lowerBound,(currentChargeStatus+percentOfCapacity/100.0)),upperBound)
-                            HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatusOfDevice))
-                          case None => // cannot handle
-                        }
-                        
-                      }
-                    } */
                   case DesiredDeltaEnergyOutput(deltaEnergyOutput) => 
-                    println("PRIORTY DESIREDENERGYOUTPUTMESSAGE " + priority)
                     priority match {
                       case High => Effect.none
                       case Low => Effect.none.thenRun { state => (lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head) match {
                         case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus   
                                                           val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
-                                                          val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  // extrapolated from the past
+                                                          val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  
                                                           
                                                           val upperBound = 1.0
                                                           val lowerBound = 0.0
-                                                          val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction //-deltaEnergyOutput/capacity + lastChargeStatus  // TODO ensure capacity is non-zero 
+                                                          val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction  
                                                           val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
                                                           implicit val system : ActorSystem[_] = context.system
-                                                          println("DESIREDENERGYOUTPUTMESSAGERECEIVED")
                                                           HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
-                        case (List(_,_),_) => // cannot compute adequate desired charge status
+                        case (List(_,_),_) => context.log.info(s"Cannot handle DesiredDeltaEnergyOutput message at $deviceId since prerequisites are not met ${(lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head).toString()}")
                     }
                   }
                   }
@@ -376,18 +350,20 @@ object Device {
         val eventHandler: (State, Event) => State = { (state, event) =>
           (state,event) match {
             case (s: DeviceState, e: EventDataRecorded) => 
-              // most current value is last
               val newLastTenDeliveredEnergyReadings = (Some(e.deliveredEnergy) :: (s.lastTenDeliveredEnergyReadings drop 1 ).reverse).reverse
               val newLastTwoChargeStatusReadings = s.lastTwoChargeStatusReadings.reverse.head :: List(Some(e.chargeStatus))
               DeviceState(e.capacity,newLastTwoChargeStatusReadings,Some(e.deliveredEnergy),newLastTenDeliveredEnergyReadings, s.priority)
             case(s: DeviceState, e: EventChargeStatusPrioritySet) =>
               DeviceState(s.capacity, s.lastTwoChargeStatusReadings, s.lastDeliveredEnergyReading, s.lastTenDeliveredEnergyReadings, e.priority)
-            //case _ => DeviceState(0,None,None,false)
           }
-        }
+        } //
+        
 
         // returns the behavior
-        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,List(None,None),None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler).withTagger(_ => Set(projectionTag)) 
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,List(None,None),None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler)
+        .withTagger(_ => Set(projectionTag)) 
+        .withRetention(RetentionCriteria.snapshotEvery(numberOfEvents = 50, keepNSnapshots = 2))
+        //.withDeleteEventsOnSnapshot)
       }
     }
     getNewBehaviour(groupId,deviceId,None)

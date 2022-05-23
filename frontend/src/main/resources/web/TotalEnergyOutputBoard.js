@@ -1,7 +1,7 @@
 "use strict"
 
 class TotalEnergyOutputBoard {
-    constructor(depositCounter,desiredTotalEnergyDeposits,htmlElementToDisplay, htmlFormElementThatProvidesDesiredPower,htmlElementThatHoldsDesiredTotalEnergyOutput,htmlElementThatHoldsCurrentTotalEnergyOutput,vppId) {
+    constructor(depositCounter,desiredTotalEnergyDeposits,htmlElementToDisplay, htmlFormElementThatProvidesDesiredPower,htmlElementThatHoldsDesiredTotalEnergyOutput,htmlElementThatHoldsCurrentTotalEnergyOutput,groupId) {
         this.depositCounter = depositCounter
         this.desiredTotalEnergyDeposits = desiredTotalEnergyDeposits
         this.currentTotalEnergyDeposits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,]
@@ -9,7 +9,7 @@ class TotalEnergyOutputBoard {
         this.attachToFormElement(htmlFormElementThatProvidesDesiredPower)
         this.htmlElementThatHoldsDesiredTotalEnergyOutput = htmlElementThatHoldsDesiredTotalEnergyOutput
         this.htmlElementThatHoldsCurrentTotalEnergyOutput = htmlElementThatHoldsCurrentTotalEnergyOutput
-        this.vppId = vppId
+        this.groupId = groupId
         this.relaxationParameter = 1.0
     }
 
@@ -75,8 +75,8 @@ class TotalEnergyOutputBoard {
 
     sendDataToServer()  {
         var headers = {"Content-Type" : "application/json"}
-        var data = JSON.stringify({"vppId": this.vppId, "desiredEnergyOutput": parseFloat(this.desiredTotalEnergyDeposits[this.desiredTotalEnergyDeposits.length-1]), "priority": 2, "relaxationParameter": parseFloat(this.relaxationParameter)})
-        Util.sendRequestToServer("/vpp/"+this.vppId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
+        var data = JSON.stringify({"groupId": this.groupId, "desiredEnergyOutput": parseFloat(this.desiredTotalEnergyDeposits[this.desiredTotalEnergyDeposits.length-1]), "relaxationParameter": parseFloat(this.relaxationParameter)})
+        Util.sendRequestToServer("/vpp/"+this.groupId+"/desired-total-energy-output","POST",data,headers) // TODO maybe currentEnergyOutput should be determined internally
     }
 
     getDataFromServer(vppId,before,after) {

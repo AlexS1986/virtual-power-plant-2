@@ -1,6 +1,6 @@
 import { Selector } from 'testcafe';
 
-fixture`Main Page`
+fixture`Main Page - Setting Desired Energy Output`
     .page`http://192.168.49.2:30408`
     .beforeEach( async t => {
         const deviceExists = Selector(".bh-batteryWidget").exists
@@ -16,6 +16,7 @@ fixture`Main Page`
          await t 
             .click(stopButtons.nth(1))
             .click(stopButtons.nth(0))
+            .wait(5000)
     })
 
 test('U6: It should be possible to set the desired total energy output for a VPP', async t => {
