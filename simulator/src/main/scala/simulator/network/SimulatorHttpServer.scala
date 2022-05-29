@@ -146,14 +146,14 @@ object SimulatorHttpServer {
                 Behaviors.same
               case None => Behaviors.same
             }
-          case ConfirmStop(deviceId, groupId) => 
-              println(s"CONFIRMSTOP RECEIVED AT $deviceId")
+          case ConfirmStop(deviceId, groupId) =>
               val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
               val newdeviceSimulatorsRegistered = deviceSimulatorsRegistered - uniqueDeviceId
               deviceSimulatorsRegistered.get(uniqueDeviceId) match {
                 case Some(deviceSimulator) => deviceSimulator ! DeviceSimulator.StopSimulator
                 case None => 
               }
+              context.log.info(s"DeviceSimulator $deviceId stop registered at guardian.") 
               getNewBehavior(newdeviceSimulatorsRegistered)
           case SetDesiredChargeStatus(deviceId, groupId, desiredChargeStatus) => 
               val uniqueDeviceId = DeviceSimulator.makeEntityId(groupId, deviceId)
@@ -167,8 +167,6 @@ object SimulatorHttpServer {
         }
       }
   }
-
-  
 
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[SimulatorGuardian.Command] =

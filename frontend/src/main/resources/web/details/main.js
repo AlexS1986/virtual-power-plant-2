@@ -1,17 +1,28 @@
+/**
+ * defines the dynamic behavior of the device-details page of the GUI
+ */
 $(document).ready(function () {
         'use strict';
 
-        const time = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        /**
+         * prepare plot for the last ten energy deposits
+         */
+        const time = [-10, -9, -8, -7, -6, -5, -4, -3, -2, -1];
         const lastTenDeliveredEnergyReadings = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         const htmlElementToPlot = document.getElementById('last-ten-energy-deposits');
 
+        /**
+         * auxiliary function that displays the last ten energy deposits
+         * @param {*} htmlElementToPlot 
+         * @param {*} time 
+         * @param {*} lastTenDeliveredEnergyReadings 
+         */
         function plotLastTenEnergyDeposits(htmlElementToPlot,time, lastTenDeliveredEnergyReadings) {
             //https://plotly.com/javascript/figure-labels/
             var layout = {
                 title: {
                   text:'Last ten energy deposits',
                   font: {
-                    family: 'Courier New, monospace',
                     size: 14
                   },
                   xref: 'paper',
@@ -21,7 +32,6 @@ $(document).ready(function () {
                   title: {
                     text: '#number',
                     font: {
-                      family: 'Courier New, monospace',
                       size: 14,
                       color: '#7f7f7f'
                     }
@@ -29,9 +39,9 @@ $(document).ready(function () {
                 },
                 yaxis: {
                     title: {
-                      text: 'Energy deposited [KWh]',
+                      text: 'Energy deposited [kWh]',
                       font: {
-                        family: 'Courier New, monospace',
+                        //family: 'Courier New, monospace',
                         size: 14,
                         color: '#7f7f7f'
                       }
@@ -42,7 +52,7 @@ $(document).ready(function () {
                 var trace1 = {
                     x: time,
                     y: lastTenDeliveredEnergyReadings,
-                    name: 'Name of Trace 1',
+                    name: 'last ten delivered energy readings',
                     type: 'scatter'
                   };  
                 
@@ -51,9 +61,10 @@ $(document).ready(function () {
             Plotly.newPlot( htmlElementToPlot, data, layout );
         }
 
+        // plot the last ten energy deposits
         plotLastTenEnergyDeposits(htmlElementToPlot, time,lastTenDeliveredEnergyReadings)
 
-        // TODO make function setDesiredChargeStatus(desiredChargeStatus)
+        // attach event listener that communicates a desired charge status to the server
         const form = document.forms.namedItem("desiredChargeStatus");
         form.addEventListener('submit', function(ev) {
             const desiredChargeStatus = this[0].value / 100.0
@@ -65,6 +76,7 @@ $(document).ready(function () {
             ev.preventDefault()
         },false);
 
+        // attach event listener that release the manual control priority, so that the charge status can be controlled by DeviceGroup again
         var releaseManualControlButton = document.getElementById('release-manual-button')
         releaseManualControlButton.onclick = function (event) {
             const deviceId = event.currentTarget.getAttribute("deviceId")
@@ -75,8 +87,16 @@ $(document).ready(function () {
             
         }
 
+        
+        /**
+         * define the periodic refresh of details page of the GUI
+         */
         function refresh() {
-            function dataFromServerHandler() { // TODO function definitions outside of loop?
+
+            /**
+             * defines how the response from the server should be used to update the details page
+             */
+            function dataFromServerHandler() { 
                 if (this.readyState == 4) {
                     if (this.status == 200) {
                         if (this.responseText != null) {
@@ -85,7 +105,7 @@ $(document).ready(function () {
                             var deviceDataFromServerJson = JSON.parse(this.response)
                             
                             const dataDiv = document.getElementById("charge-status-div")
-                            dataDiv.innerHTML = deviceDataFromServerJson.data*100.0
+                            dataDiv.innerHTML = deviceDataFromServerJson.chargeStatus*100.0
                             
                             const hostDiv = document.getElementById("host-div")
                             hostDiv.innerHTML = deviceDataFromServerJson.currentHost
@@ -100,14 +120,14 @@ $(document).ready(function () {
                 }
             }
 
+            // send request for the individual state of the device to the server
             var headers = {}
             const deviceId = document.getElementById("release-manual-button").getAttribute("deviceId")
             const groupId = document.getElementById("release-manual-button").getAttribute("groupId")
-
             Util.sendRequestToServer("/vpp/device/"+groupId+"/"+deviceId,"GET",null,headers,dataFromServerHandler)
         }
 
         refresh()
-        const intervalId = setInterval(refresh, 1 * 2000)
+        const intervalId = setInterval(refresh, 1 * 2000) // repeat every 2 seconds
     }
 )

@@ -21,6 +21,8 @@ import akka.actor.typed.ActorRef
 
 import java.time.format.DateTimeFormatter
 import java.time.LocalDateTime
+import akka.http.javadsl.model.StatusCodes
+import akka.actor.Status
 
 /**
   * actors of this type simulate hardware
@@ -63,10 +65,8 @@ object DeviceSimulator {
 
   /**
     * this message is sent to this actor to trigger a new simulation step
-    *
-    * @param parameters
     */
-  private[DeviceSimulator] final case class RunSimulation(parameters: String) extends Command
+  private[DeviceSimulator] final case object RunSimulation extends Command
 
   /**
     * this message is sent by this actor to its twin in order to record its current state etc.
@@ -157,15 +157,13 @@ object DeviceSimulator {
       implicit val system: ActorSystem[_] = context.system
       message match {
         case StartSimulation => 
-          println(s"ALERT:Track Device request sent for $deviceId")
           implicit val executionContext = system.executionContext
             sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST).onComplete{
-              case Success(httpResponse) =>  println(s"ALERT:Device $deviceId successfully tracked: $httpResponse")
+              case Success(httpResponse) => println(s" [INFO] Device successfully tracked at twin microservice: $httpResponse")
               case Failure(exception) => context.scheduleOnce(2.seconds, context.self,StartSimulation) // try again later
           }
-          //sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestTracking,HttpMethods.POST)
           if (!simulationRunning) {
-            context.self ! RunSimulation("even")
+            context.self ! RunSimulation
             getNewBehavior(
               groupId,
               deviceId,
@@ -180,11 +178,8 @@ object DeviceSimulator {
           } else {
             Behaviors.same
           }
-        case StopSimulation(replyTo) => 
-          // give all messages time to be processed by twin
-          //context.scheduleOnce(1.seconds, context.self,UntrackDeviceAtTwin(replyTo)) 
+        case StopSimulation(replyTo) =>  
           context.self ! UntrackDeviceAtTwin(replyTo)
-          //replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId)
           getNewBehavior(
               groupId,
               deviceId,
@@ -196,9 +191,7 @@ object DeviceSimulator {
               urlToRequestUnTracking,
               false // do not process any RunSimulation messages and stop sending them
             )
-          //Behaviors.same
         case StopSimulator =>
-          println(s"STOPSIMULATOR RECEIVED AT $deviceId")
           Behaviors.stopped
         case SetDesiredChargeStatus(desiredChargeStatus) => 
           getNewBehavior(
@@ -215,19 +208,18 @@ object DeviceSimulator {
         case UntrackDeviceAtTwin(replyTo) => 
           implicit val executionContext = system.executionContext
             sendJsonViaHttp(GroupIdDeviceId(groupId,deviceId).toJson,urlToRequestUnTracking, HttpMethods.POST).onComplete{
-              case Success(httpResponse) =>  replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId) // confirm stop after untrack has been delivered
-              case Failure(exception) => context.scheduleOnce(2.seconds, context.self,UntrackDeviceAtTwin(replyTo))
-                                          // try again later
+              case Success(httpResponse) if (httpResponse.status == StatusCodes.ACCEPTED || httpResponse.status == StatusCodes.OK) =>  
+                                            replyTo ! simulator.network.SimulatorHttpServer.SimulatorGuardian.ConfirmStop(deviceId,groupId) // confirm stop after untrack has been delivered
+              case _ => context.scheduleOnce(2.seconds, context.self,UntrackDeviceAtTwin(replyTo)) // try again later
           }
           Behaviors.same
-        case RunSimulation(parameters) => {
+        case RunSimulation => {
           if(simulationRunning) {
           val (message, delay, newChargeStatus) =
             simulateDevice(
               groupId,
               deviceId,
               routeToPostTemperature,
-              parameters,
               capacity,
               chargeStatus,
               desiredChargeStatus,
@@ -247,7 +239,6 @@ object DeviceSimulator {
           } else {
             Behaviors.same
           }
-          //Behaviors.same
         }
       }
     }
@@ -266,18 +257,14 @@ object DeviceSimulator {
       groupId: String,
       deviceId: String,
       urlToPostData: String,
-      parameters: String,
       capacity: Double,
       chargeStatus: Double,
       desiredChargeStatus: Double,
-  )(implicit system: ActorSystem[_]): (RunSimulation, FiniteDuration, Double) = {
+  )(implicit system: ActorSystem[_]): (Command, FiniteDuration, Double) = {
 
     assert( chargeStatus>= 0.0 && chargeStatus <= 1.0, "ChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + chargeStatus)
     assert( desiredChargeStatus>= 0.0 && desiredChargeStatus <= 1.0, "DesiredChargeStatus of DeviceSimulator is not in allowable range [0,1]: " + desiredChargeStatus)
-    // this is the desired charge status that this device should reach and can be controlled externally
-    //val desiredChargeStatus = 1.0
     val desiredEnergyStoredInHardware  = (desiredChargeStatus - chargeStatus) * capacity
-
 
     val now = LocalDateTime.now()
     val secondsOfDay = now.toLocalTime().toSecondOfDay()
@@ -319,16 +306,6 @@ object DeviceSimulator {
     // the new chargeStatus
     val newChargeStatus = (chargeStatus*capacity+energyStoredInLocalHardware)/capacity
 
-    /*println("")
-    println("DeviceId GroupId:" + deviceId + " " + groupId)
-    println("secondsOfDay: " + secondsOfDay)
-    println("randomPart " + random)
-    println("periodicLocalEnergyProduction " + periodicLocalEnergyProduction)
-    println("localEnergyProduction: " + localEnergyProduction)
-    println("energyStoredInLocalHardware: " + energyStoredInLocalHardware)
-    println("energyDeposit: " + energyDeposit)
-    println("newChargeStatus: " + newChargeStatus) */
-
     /**
       * report activities and status to twin
       */
@@ -338,9 +315,9 @@ object DeviceSimulator {
     /**
       * compute a message for self that drives the simulation forward
       */
-    val nextParamters = if (parameters == "even") "odd" else "even"
+    val nextParamters = ""
     val delayNextMessage = 2.seconds
-    (RunSimulation(nextParamters), delayNextMessage, newChargeStatus)
+    (RunSimulation, delayNextMessage, newChargeStatus)
   }
 
   /**

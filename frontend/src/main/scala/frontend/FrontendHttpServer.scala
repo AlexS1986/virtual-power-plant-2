@@ -102,7 +102,7 @@ object FrontendHttpServer {
     * @param data
     * @param currentHost
     */
-  case class DeviceData(data: Double, lastTenDeliveredEnergyReadings: List[Option[Double]], currentHost: String, priority: Priority)
+  case class DeviceData(chargeStatus: Double, lastTenDeliveredEnergyReadings: List[Option[Double]], currentHost: String, priority: Priority)
   implicit val priorityFormat = new JsonFormat[Priority] {
     def write(x: Priority) = x match {
       case Priorities.High => JsString("High")
@@ -193,7 +193,6 @@ object FrontendHttpServer {
         post {
           entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest => 
             sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/energies",HttpMethods.DELETE)
-            //sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/deleteEnergyDeposits",HttpMethods.POST)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Energies requested for delete before "+deleteEnergyDepositsRequest.before.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))))
           }
         }
@@ -203,7 +202,6 @@ object FrontendHttpServer {
           parameter("before") { before => 
             parameter("after") { after => 
               onComplete { // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/future-directives/onComplete.html
-                //val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 val dates = Try {
                   (LocalDateTime.parse(before), LocalDateTime.parse(after))
                 } 
@@ -260,17 +258,9 @@ object FrontendHttpServer {
             case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
           }
         },
-        /*post {
-            entity(as[DeviceIdentifier]) { deviceIdentifier =>
-            sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/stop",HttpMethods.POST)
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceIdentifier.deviceId+ " requested for STOP in simulator."))
-          }
-        },*/
         delete {
-            //entity(as[DeviceIdentifier]) { deviceIdentifier =>
             sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToTwin+"/stop",HttpMethods.POST)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for STOP in simulator."))
-          //}
         })
       },
       path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (vppId,deviceId) =>

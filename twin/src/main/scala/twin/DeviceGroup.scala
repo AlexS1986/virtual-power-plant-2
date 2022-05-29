@@ -91,7 +91,7 @@ object DeviceGroup {
     * @param data
     *   a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(data: Map[String, DeviceGroupQuery.DataReading])
+  final case class RespondAllData(data: Map[String, DeviceGroupQuery.ChargeStatusReading])
 
   /** a message that requests to send a stop command to the hardware associated with the Device
     *

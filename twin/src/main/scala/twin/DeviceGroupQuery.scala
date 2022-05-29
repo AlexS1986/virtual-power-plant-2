@@ -51,25 +51,24 @@ object DeviceGroupQuery {
   /**
     * required to read and write objects of a type with multiple subtypes
     */
-  implicit object DataReadingJsonWriter extends RootJsonFormat[DataReading] {
-    def write(dataReading: DataReading) : JsValue = {
-      dataReading match {
-        case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "temperature".toJson)
-        case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "temperature not available".toJson)
+  implicit object ChargeStatusReadingJsonWriter extends RootJsonFormat[ChargeStatusReading] {
+    def write(ChargeStatusReading: ChargeStatusReading) : JsValue = {
+      ChargeStatusReading match {
+        case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "chargeStatus".toJson)
+        case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "chargeStatus not available".toJson)
         case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
       }
     }
                                   
-    def read(json : JsValue) : DataReading = {
+    def read(json : JsValue) : ChargeStatusReading = {
       json.asJsObject.getFields("description") match {
-        case Seq(JsString(description)) if description == "temperature" => json.asJsObject.getFields("value") match { //TODO temperature
+        case Seq(JsString(description)) if description == "chargeStatus" => json.asJsObject.getFields("value") match { 
           case Seq(JsNumber(value), JsString(currentHost)) => DeviceData(value.toDouble, currentHost)
           case _ => throw new DeserializationException("Double expected.")
         }
-        case Seq(JsString(description)) if description == "temperature not available" => DataNotAvailable // TODO temperature
-        //case Seq(JsString(description)) if description == "device not available" => DeviceNotAvailable
+        case Seq(JsString(description)) if description == "chargeStatus not available" => DataNotAvailable 
         case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
-        case _ => throw new DeserializationException("Temperature Reading expected.")
+        case _ => throw new DeserializationException("chargeStatus reading expected.")
       }
     } 
   } 
@@ -77,7 +76,7 @@ object DeviceGroupQuery {
   /**
     * this type defines the status of Devices that are queried by this actor
     */
-  sealed trait DataReading
+  sealed trait ChargeStatusReading
 
   /**
     * Device data that has been reported successfully 
@@ -85,17 +84,17 @@ object DeviceGroupQuery {
     * @param value
     * @param currentHost
     */
-  final case class DeviceData(value: Double, currentHost: String) extends DataReading
+  final case class DeviceData(value: Double, currentHost: String) extends ChargeStatusReading
 
   /**
     * Data has not been reported completely yet at the Device
     */
-  case object DataNotAvailable extends DataReading
+  case object DataNotAvailable extends ChargeStatusReading
 
   /**
     * this Device has not responded in time
     */
-  case object DeviceTimedOut extends DataReading
+  case object DeviceTimedOut extends ChargeStatusReading
 }
 
 class DeviceGroupQuery(
@@ -107,13 +106,12 @@ class DeviceGroupQuery(
     extends AbstractBehavior[DeviceGroupQuery.Command](context) {
 
   import DeviceGroupQuery._
-  import DeviceGroup.RespondAllData
 
   timers.startSingleTimer(CollectionTimeout, CollectionTimeout, timeout)
 
   private val respondDataAdapter = context.messageAdapter(WrappedRespondData.apply)
 
-  private var repliesSoFar = Map.empty[String, DataReading]
+  private var repliesSoFar = Map.empty[String, ChargeStatusReading]
   private var stillWaiting = deviceIdToActor.keySet
 
 
@@ -151,7 +149,7 @@ class DeviceGroupQuery(
 
   private def respondWhenAllCollected(): Behavior[Command] = {
     if (stillWaiting.isEmpty) {
-      requester ! RespondAllData(repliesSoFar)
+      requester ! DeviceGroup.RespondAllData(repliesSoFar)
       Behaviors.stopped
     } else {
       this

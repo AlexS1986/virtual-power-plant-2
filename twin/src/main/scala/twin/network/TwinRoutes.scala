@@ -279,7 +279,7 @@ private[twin] final class TwinRoutes(
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
                   DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo))  
                   .map {
-                    import DeviceGroupQuery.DataReadingJsonWriter
+                    import DeviceGroupQuery.ChargeStatusReadingJsonWriter
                     respondData => respondData.data.toJson.toString   
                   }
                 case None => throw new Exception("Internal server error")

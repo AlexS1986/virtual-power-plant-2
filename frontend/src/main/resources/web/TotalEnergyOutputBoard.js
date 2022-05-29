@@ -48,16 +48,63 @@ class TotalEnergyOutputBoard {
     }
 
     plot() {
-        Plotly.newPlot( this.htmlElementToDisplay, [{
+        var layout = {
+            title: {
+              text:'Trailing total energy output',
+              font: {
+                size: 14
+              },
+              xref: 'paper',
+              x: 0.05,
+            },
+            xaxis: {
+              title: {
+                text: 'Period',
+                font: {
+                  size: 14,
+                  color: '#7f7f7f'
+                }
+              },
+            },
+            yaxis: {
+                title: {
+                  text: 'Energy deposited [kWh]',
+                  font: {
+                    size: 14,
+                    color: '#7f7f7f'
+                  }
+                }
+              }
+            };
+
+        var trace1 = {
+                x: this.depositCounter,
+                y: this.desiredTotalEnergyDeposits,
+                name: 'Desired Total Energy Output [kWh]',
+                type: 'scatter'
+              }; 
+        
+        var trace2 = {
+                x: this.depositCounter,
+                y: this.currentTotalEnergyDeposits,
+                name: 'Current Total Energy Output [kWh]',
+                type: 'scatter'
+              }; 
+
+        var data = [trace1, trace2];
+
+        Plotly.newPlot(this.htmlElementToDisplay, data, layout)
+
+        /*Plotly.newPlot( this.htmlElementToDisplay, [{
             x: this.depositCounter,
             y: this.desiredTotalEnergyDeposits,
-            name: "Desired Total Energy Output" }, 
+            name: "Desired Total Energy Output [kWh]" }, 
             {
             x: this.depositCounter,
             y: this.currentTotalEnergyDeposits,
-            name: "Current Total Energy Output" }
+            name: "Current Total Energy Output [kWh]" }
         ], {
-        margin: { t: 0 } } );
+        margin: { t: 0 } } ); */
         this.shiftdesiredTotalEnergyDeposits()
     }
 

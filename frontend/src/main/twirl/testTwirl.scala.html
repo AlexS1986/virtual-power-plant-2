@@ -26,11 +26,11 @@
     <div id="host-div">@deviceData.currentHost</div>
   </p>
 
-  <p><label><em>Charge status [&#37;]</em></label><div id="charge-status-div">@{deviceData.data*100.0}</div></p>
+  <p><label><em>Charge status [&#37;]</em></label><div id="charge-status-div">@{deviceData.chargeStatus*100.0}</div></p>
 
     <form enctype="multipart/form-data" method="post" name="desiredChargeStatus" deviceId="@deviceId" groupId="@groupId">
       <label> Desired Charge Status [&#37;]</label>
-      <input type="number" name="desiredChargeStatusInput" min="0" max="100" value=@{deviceData.data*100} required>
+      <input type="number" name="desiredChargeStatusInput" min="0" max="100" value=@{deviceData.chargeStatus*100} required>
       <input type="submit" value="upload">
     </form>
 
