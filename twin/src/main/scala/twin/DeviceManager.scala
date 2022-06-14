@@ -34,7 +34,7 @@ object DeviceManager {
     * @param deviceId
     * @param replyTo
     */
-  final case class RequestTrackDevice(groupId: String, deviceId: String, replyTo: ActorRef[DeviceGroup.RespondTrackDevice]) extends DeviceManager.Command
+  final case class RequestTrackDevice(groupId: String, deviceId: String, replyTo: ActorRef[DeviceGroup.RespondTrackDevice]) extends DeviceManager.Command with CborSerializable
 
   /**
     * a message that request to stop tracking a hardware and remove the it from the Device members of a DeviceGroup
@@ -42,7 +42,7 @@ object DeviceManager {
     * @param groupId
     * @param deviceId
     */
-  final case class RequestUnTrackDevice(groupId: String,deviceId: String) extends Command
+  final case class RequestUnTrackDevice(groupId: String,deviceId: String) extends Command with CborSerializable
 
 
   /**
@@ -51,7 +51,7 @@ object DeviceManager {
     * @param deviceId
     * @param groupId
     */
-  final case class StopDevice(deviceId: String, groupId: String) extends Command
+  final case class StopDevice(deviceId: String, groupId: String) extends Command with CborSerializable
 
   /**
     * sets the desired charge status at a specific Device
@@ -60,7 +60,7 @@ object DeviceManager {
     * @param groupId
     * @param desiredChargeStatus
     */
-  final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command
+  final case class SetDesiredChargeStatus(deviceId: String, groupId: String, desiredChargeStatus: Double) extends Command with CborSerializable
 
   /**
     * resets the priority of accepted messages for a specific Device to the lowest level
@@ -68,7 +68,7 @@ object DeviceManager {
     * @param deviceId
     * @param groupId
     */
-  final case class ResetPriority(deviceId: String, groupId: String) extends Command
+  final case class ResetPriority(deviceId: String, groupId: String) extends Command with CborSerializable
 
   /**
     * sets the desired total energy output and relaxation parameter for this DeviceGroup
@@ -77,12 +77,12 @@ object DeviceManager {
     * @param desiredEnergyOutput
     * @param relaxationParameter
     */
-  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, relaxationParameter: Double) extends Command
+  final case class DesiredTotalEnergyOutput(groupId: String, desiredEnergyOutput: Double, relaxationParameter: Double) extends Command with CborSerializable
 
   /**
     * requests to adjust the total energy output to the desired value
     */
-  final case class AdjustTotalEnergyOutput(groupId: String, relaxationParameter: Double) extends Command
+  private[DeviceManager] final case class AdjustTotalEnergyOutput(groupId: String, relaxationParameter: Double) extends Command with CborSerializable
 
   /**
     * a message that requests to record data from hardware in the associated Device in the specified DeviceGroup
@@ -93,14 +93,14 @@ object DeviceManager {
     * @param chargeStatus
     * @param deliveredEnergy
     */
-  final case class RecordData( // TODO should be associated with a timestamp 
+  final case class RecordData(  
       groupId: String,
       deviceId: String,
       capacity: Double,
       chargeStatus: Double,
       deliveredEnergy: Double,
       deliveredEnergyDate: LocalDateTime,
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /**
     * a message that requests to report the Data for a Device in the specified DeviceGroup
@@ -109,11 +109,11 @@ object DeviceManager {
     * @param deviceId
     * @param replyTo
     */
-  final case class RequestData( // TODO remove Request
+  final case class RequestData( 
       groupId: String,
       deviceId: String,
       replyTo: ActorRef[Device.RespondData]
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /**
     * a message that requests the data of all Devices in a DeviceGroup
@@ -124,7 +124,7 @@ object DeviceManager {
   final case class RequestAllData( 
       groupId: String,
       replyTo: ActorRef[DeviceGroup.RespondAllData]
-  ) extends Command
+  ) extends Command with CborSerializable
  
 }
 

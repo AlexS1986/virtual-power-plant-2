@@ -40,6 +40,10 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test)
 }
 
+// serialization with jackson
+libraryDependencies += "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.11.0" 
+
 libraryDependencies ++= Seq( // Akka persistence event-sourcing https://doc.akka.io/docs/akka/current/typed/persistence.html
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test

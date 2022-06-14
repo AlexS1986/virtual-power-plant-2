@@ -30,10 +30,14 @@ import akka.actor.SupervisorStrategy
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
-import twin.Device.Priorities.High
-import twin.Device.Priorities.Low
+import twin.Device.Priority.High
+import twin.Device.Priority.Low
 
 import akka.persistence.typed.scaladsl.RetentionCriteria
+
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import com.fasterxml.jackson.databind.annotation.JsonSerialize
+
 
 
 /** represents the digital twin of a device
@@ -54,7 +58,7 @@ object Device {
     */
   final case class ReadData(
       replyTo: ActorRef[RespondData]
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /**
     * a message that represents the data sent from hardware to a Device
@@ -71,7 +75,7 @@ object Device {
       chargeStatus: Double,
       deliveredEnergy: Double,
       deliveredEnergyDate: LocalDateTime,
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /**
     * a message that is sent by a Device in response to a ReadData message
@@ -85,28 +89,28 @@ object Device {
       deviceId: String,
       state: DeviceState,
       currentHost : Option[String] 
-  )
+  ) extends CborSerializable
 
   /**
     * a request to stop the hardware associated with this Device
     */
-  final case object StopDevice extends Command
+  final case object StopDevice extends Command with CborSerializable
 
   /**
     * 
     *
     * @param desiredChargeStatus
     */
-  final case class SetDesiredChargeStatus(desiredChargeStatus: Double, priority: Priority) extends Command
+  final case class SetDesiredChargeStatus(desiredChargeStatus: Double, priority: Priority) extends Command with CborSerializable
 
-  final case object ResetPriority extends Command
+  final case object ResetPriority extends Command with CborSerializable
 
-  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command
+  final case class DesiredDeltaEnergyOutput(deltaEnergyOutput: Double) extends Command with CborSerializable
 
   /**
     * states that a device can assume
     */
-  sealed trait State
+  sealed trait State extends CborSerializable
 
   /**
     * an instance of a state a device can assume
@@ -144,24 +148,41 @@ object Device {
     chargeStatus: Double,
     deliveredEnergy: Double,
     deliveredEnergyDate: LocalDateTime,
-  ) extends Event
+  ) extends Event with CborSerializable
 
+  //import com.fasterxml.jackson.annotation._
   /** 
     * determines which messages the Device will accept and process
     */
-  sealed trait Priority {
+  /* @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+  @JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[Device.Priority.High], name = "High"),
+    new JsonSubTypes.Type(value = classOf[Device.Priority.Low], name = "Low"))) */
+  
+
+
+@JsonSerialize(`using` = classOf[PriorityJsonSerializer])
+@JsonDeserialize(`using` = classOf[PriorityJsonDeserializer])
+sealed trait Priority {
     def > (o: Priority) : Boolean = {
       this match {
-        case Priorities.High => if(o == Priorities.Low) true else false 
-        case Priorities.Low => false
+        case Priority.High => if(o == Priority.Low) true else false 
+        case Priority.Low => false
       }
     }
   }
   
-  final case object Priorities {
-    final case object High extends Priority 
-    final case object Low extends Priority
+  final object Priority {
+    final case object High extends Priority //with CSerializable
+    final case object Low extends Priority //with PrioritySerializable
   }
+
+
+
+ 
+
+  
   
   /**
     * triggered if the priority level is changed
@@ -169,7 +190,7 @@ object Device {
     * @param persistenceId
     * @param priority
     */
-  final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event
+  final case class EventChargeStatusPrioritySet(persistenceId: String, priority: Priority) extends Event with CborSerializable
 
   
   /**
@@ -279,7 +300,6 @@ object Device {
       }
       
       Behaviors.setup { context =>
-
         /**
           * processes a Command and returns an Effect that defines which Events should be triggered and persisted
           *
@@ -360,7 +380,7 @@ object Device {
         
 
         // returns the behavior
-        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,List(None,None),None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priorities.Low),commandHandler,eventHandler)
+        EventSourcedBehavior[Command, Event, State](persistenceId,emptyState = DeviceState(0,List(None,None),None,List[Option[Double]](None,None,None,None,None,None,None,None,None,None),Priority.Low),commandHandler,eventHandler)
         .withTagger(_ => Set(projectionTag)) 
         .withRetention(RetentionCriteria.snapshotEvery(numberOfEvents = 50, keepNSnapshots = 2))
         //.withDeleteEventsOnSnapshot)

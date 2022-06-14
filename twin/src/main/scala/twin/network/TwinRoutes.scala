@@ -26,8 +26,8 @@ import twin._
 
 import java.time.LocalDateTime
 //import java.time.format.DateTimeFormatter
-import twin.Device.Priorities.High
-import twin.Device.Priorities.Low
+import twin.Device.Priority.High
+import twin.Device.Priority.Low
 
 
 
@@ -36,6 +36,8 @@ private[twin] final class TwinRoutes(
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
 ) {
   import Formats.localDateTimeFormat
+
+  import Formats.priorityFormat
 
   val readsideHost = system.settings.config.getConfig("readside").getString("host")
   val readsidePort = system.settings.config.getConfig("readside").getString("port")
@@ -99,21 +101,8 @@ private[twin] final class TwinRoutes(
     * @param priority the current priority level of messages that the Device accepts
     */
   case class DeviceData(chargeStatus: Double, lastTenDeliveredEnergyReadings: List[Option[Double]] , currentHost: String, priority: Device.Priority)
-  implicit val priorityFormat = new JsonFormat[Device.Priority] {
-    def write(x: Device.Priority) = x match {
-      case High => JsString("High")
-      case Low => JsString("Low")
-      }
-    def read(value: JsValue) = value match {
-      case JsString(x) => x match {
-        case "High" => High
-        case "Low"  => Low
-        case _ => throw new RuntimeException(s"Unexpected string ${x} when trying to parse Priority")
-      }
-      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse Priority")
-    }
-  }
   implicit val deviceDataFormat = jsonFormat4(DeviceData)
+  
 
   implicit val executionContext = system.executionContext
 
@@ -135,7 +124,8 @@ private[twin] final class TwinRoutes(
     concat(
       path("twin" / "stop") {  // sends a command to an existing device to stop it
         entity(as[DeviceIdentifier]) { deviceIdentifier => //
-          getDeviceManager match {
+          val deviceManagerOption : Option[ActorRef[DeviceManager.Command]] = getDeviceManager
+          deviceManagerOption match {
             case Some(deviceManager) => deviceManager ! DeviceManager.StopDevice(deviceIdentifier.deviceId,deviceIdentifier.groupId) 
             case None => complete(StatusCodes.InternalServerError)
           }
@@ -153,7 +143,8 @@ private[twin] final class TwinRoutes(
               implicit val timeout: Timeout = 5.seconds
               implicit val actorSystem      = system
 
-              getDeviceManager match {
+              val deviceManagerOption : Option[ActorRef[DeviceManager.Command]] = getDeviceManager
+              deviceManagerOption match {
                 case Some(deviceManager) => deviceManager.ask(replyTo =>  DeviceManager.RequestTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId, replyTo)) // TODO: handling of response required?
                                             complete(StatusCodes.Accepted, "Device track request received")
                 case None => complete(StatusCodes.InternalServerError)

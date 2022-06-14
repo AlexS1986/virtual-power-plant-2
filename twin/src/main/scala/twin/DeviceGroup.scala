@@ -61,7 +61,7 @@ object DeviceGroup {
     * @param groupId
     * @param deviceId
     */
-  final case class RequestUnTrackDevice(deviceId: String) extends Command
+  final case class RequestUnTrackDevice(deviceId: String) extends Command with CborSerializable
 
   /** this message requests this actor to add a member
     *
@@ -71,19 +71,19 @@ object DeviceGroup {
   final case class RequestTrackDevice(
       deviceId: String,
       replyTo: ActorRef[DeviceGroup.RespondTrackDevice]
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /** this message is sent as a positive response to a request to track this device
     *
     * @param deviceId
     */
-  final case class RespondTrackDevice(deviceId: String)
+  final case class RespondTrackDevice(deviceId: String) extends CborSerializable
 
   /** this message requests this actor to return the state of all its members
     *
     * @param replyTo
     */
-  final case class RequestAllData(replyTo: ActorRef[DeviceGroup.RespondAllData]) extends Command
+  final case class RequestAllData(replyTo: ActorRef[DeviceGroup.RespondAllData]) extends Command with CborSerializable
 
   /** this message is sent in response to a request to return the state of all its members
     *
@@ -91,13 +91,13 @@ object DeviceGroup {
     * @param data
     *   a map (deviceId -> read data) of the state of all members
     */
-  final case class RespondAllData(data: Map[String, DeviceGroupQuery.ChargeStatusReading])
+  final case class RespondAllData(data: Map[String, DeviceGroupQuery.ChargeStatusReading]) extends CborSerializable
 
   /** a message that requests to send a stop command to the hardware associated with the Device
     *
     * @param deviceId
     */
-  final case class StopDevice(deviceId: String) extends Command
+  final case class StopDevice(deviceId: String) extends Command with CborSerializable
 
   /** set the desired charge status for a specific Device
     *
@@ -105,13 +105,13 @@ object DeviceGroup {
     * @param desiredChargeStatus
     */
   final case class SetDesiredChargeStatus(deviceId: String, desiredChargeStatus: Double)
-      extends Command
+      extends Command with CborSerializable
 
   /** reset the priority of accepted messages for a specific Device to the lowest level
     *
     * @param deviceId
     */
-  final case class ResetPriority(deviceId: String) extends Command
+  final case class ResetPriority(deviceId: String) extends Command with CborSerializable
 
   /** sets the desired total energy output and relaxation parameter for this DeviceGroup
     *
@@ -121,18 +121,18 @@ object DeviceGroup {
   final case class DesiredTotalEnergyOutput(
       desiredTotalEnergyOutput: Double,
       relaxationParameter: Double
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /** requests to adjust the total energy output to the desired value
     */
-  final case object AdjustTotalEnergyOutput extends Command
+  final case object AdjustTotalEnergyOutput extends Command with CborSerializable
 
   /** a message that requests to report the Data for a Device
     *
     * @param deviceId
     */
   final case class RequestData(deviceId: String, replyTo: ActorRef[Device.RespondData])
-      extends Command
+      extends Command with CborSerializable
 
   /** a message that requests to record data from hardware in the associated Device
     *
@@ -147,17 +147,17 @@ object DeviceGroup {
       chargeStatus: Double,
       deliveredEnergy: Double,
       deliveredEnergyDate: LocalDateTime
-  ) extends Command
+  ) extends Command with CborSerializable
 
   /** states that this actor can assume
     */
-  sealed trait State
+  sealed trait State extends CborSerializable
 
   /** state is defined by the current members, i.e. Devices, in this group and the desired total
     * energy output
     *
     * @param registeredDevices
-    *   // TODO change to devicesTracked? the set of the PersistenceIds of the members of this group
+    *    the set of the PersistenceIds of the members of this group
     * @param desiredTotalEnergyOutput
     */
   final case class DeviceGroupState(
@@ -175,19 +175,19 @@ object DeviceGroup {
     * @param persistenceId
     * @param deviceId
     */
-  final case class EventDeviceRegistered(persistenceId: String, deviceId: String) extends Event
+  final case class EventDeviceRegistered(persistenceId: String, deviceId: String) extends Event with CborSerializable
 
   /** a Device leaves this group
     *
     * @param persistenceId
     * @param deviceId
     */
-  final case class EventDeviceUnRegistered(persistenceId: String, deviceId: String) extends Event
+  final case class EventDeviceUnRegistered(persistenceId: String, deviceId: String) extends Event with CborSerializable
 
   final case class EventDesiredTotalEnergyOutputChanged(
       desiredTotalEnergyOutput: Double,
       relaxationParameter: Double
-  ) extends Event
+  ) extends Event with CborSerializable
 
   /** defines a type of an entity for cluster sharding
     */
@@ -292,7 +292,7 @@ object DeviceGroup {
                       )
                       device ! Device.SetDesiredChargeStatus(
                         desiredChargeStatus,
-                        Device.Priorities.High
+                        Device.Priority.High
                       )
                     }
                   }

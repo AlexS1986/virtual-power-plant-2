@@ -15,6 +15,12 @@ import spray.json._
 import spray.json.DefaultJsonProtocol._ 
 import java.time.LocalDateTime
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
+
+
 /**
   * an actor that is spawned to manage a query for the status of all Devices currently belonging to a DeviceGroup
   */
@@ -39,14 +45,14 @@ object DeviceGroupQuery {
   /**
     * this message is sent to this actor when the time limit for waiting for responses from queried Device's has passed
     */
-  private final case object CollectionTimeout extends Command
+  private final case object CollectionTimeout extends Command with CborSerializable
 
   /**
     * this message is sent to this actor in order to report data from a particular Device
     *
     * @param response
     */
-  private final case class WrappedRespondData(response: Device.RespondData) extends Command
+  private final case class WrappedRespondData(response: Device.RespondData) extends Command with CborSerializable
 
   /**
     * required to read and write objects of a type with multiple subtypes
@@ -75,8 +81,15 @@ object DeviceGroupQuery {
 
   /**
     * this type defines the status of Devices that are queried by this actor
+    * https://doc.akka.io/docs/akka/current/serialization-jackson.html
     */
-  sealed trait ChargeStatusReading
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+  @JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[DeviceData], name = "deviceData"),
+    new JsonSubTypes.Type(value = classOf[DataNotAvailable], name = "dataNotAvailable"),
+    new JsonSubTypes.Type(value = classOf[DeviceTimedOut], name = "deviceTimedOut")))
+  sealed trait ChargeStatusReading extends CborSerializable
 
   /**
     * Device data that has been reported successfully 
@@ -89,12 +102,16 @@ object DeviceGroupQuery {
   /**
     * Data has not been reported completely yet at the Device
     */
-  case object DataNotAvailable extends ChargeStatusReading
+  @JsonDeserialize(`using` = classOf[DataNotAvailableDeserializer])
+  sealed trait DataNotAvailable
+  case object DataNotAvailable extends DataNotAvailable with ChargeStatusReading
 
   /**
     * this Device has not responded in time
     */
-  case object DeviceTimedOut extends ChargeStatusReading
+  @JsonDeserialize(`using` = classOf[DeviceTimedOutDeserializer])
+  sealed trait DeviceTimedOut
+  case object DeviceTimedOut extends DeviceTimedOut with ChargeStatusReading
 }
 
 class DeviceGroupQuery(

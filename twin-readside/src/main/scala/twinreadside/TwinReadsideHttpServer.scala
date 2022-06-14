@@ -65,23 +65,6 @@ object TwinReadsideHttpServer{
   final case class EnergyDepositedResult(energyDeposited : Option[Double])
   implicit val energyDepositedResultFormat = jsonFormat1(EnergyDepositedResult)
 
-  /*final case class DeviceAndTemperature(deviceId: String, temperature: Double)
-  final case class DevicesAndTemperatures(devicesAndTemperatures: List[DeviceAndTemperature])
-
-  final case class RecordTemperature(groupId: String,deviceId: String,value: Double)
-
-  final case class StartSimulation(deviceId: String, groupId: String) 
-  final case class StopSimulation(deviceId: String, groupId: String) 
-
-  implicit val startSimulation = jsonFormat2(StartSimulation)
-  implicit val stopSimulation = jsonFormat2(StopSimulation)
-
-
-  implicit val deviceAndTemperatureFormat = jsonFormat2(DeviceAndTemperature)
-  implicit val devicesAndTemperaturesFormat = jsonFormat1(DevicesAndTemperatures)
-
-  implicit val recordTemperature = jsonFormat3(RecordTemperature) */
-
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem[_] =
       ActorSystem(Behaviors.empty, "readside")
