@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
+import com.fasterxml.jackson.annotation.JsonTypeName
 
 
 /**
@@ -104,14 +105,16 @@ object DeviceGroupQuery {
     */
   @JsonDeserialize(`using` = classOf[DataNotAvailableDeserializer])
   sealed trait DataNotAvailable
-  case object DataNotAvailable extends DataNotAvailable with ChargeStatusReading
+  @JsonTypeName("dataNotAvailable")
+  case object DataNotAvailable extends ChargeStatusReading with DataNotAvailable 
 
   /**
     * this Device has not responded in time
     */
   @JsonDeserialize(`using` = classOf[DeviceTimedOutDeserializer])
   sealed trait DeviceTimedOut
-  case object DeviceTimedOut extends DeviceTimedOut with ChargeStatusReading
+  @JsonTypeName("deviceTimedOut")
+  case object DeviceTimedOut extends ChargeStatusReading with DeviceTimedOut 
 }
 
 class DeviceGroupQuery(

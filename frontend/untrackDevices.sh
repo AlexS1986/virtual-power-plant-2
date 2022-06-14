@@ -1,7 +1,7 @@
 #!/bin/bash
 kubectl config set-context --current --namespace=iot-system-1
 http_port_twin=$(kubectl get service | grep "iot-system-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
-numberOfDevices=100
+numberOfDevices=2000
 http_port_frontend=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
 
 
