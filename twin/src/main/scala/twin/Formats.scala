@@ -31,7 +31,9 @@ object Formats {
     }
   }
 
-  /** represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
+  object TwinReadSideFormats {
+    /** represents the body of a http-request to obtain the energy deposited in a DeviceGroup in a timespan 
+    * that is sent to the twin readside microservice
     *
     * @param groupId
     * @param before
@@ -46,11 +48,13 @@ object Formats {
 
   final case class EnergyDepositedResponse(energyDeposited: Option[Double])
   implicit val energyDepositedResponseFormat = jsonFormat1(EnergyDepositedResponse)
+}
+  
 
 
   /**
     * serialization of Device.Priority
-    */
+  */
   import Device.Priority.High
   import Device.Priority.Low
   implicit val priorityFormat = new JsonFormat[Device.Priority] {
@@ -67,9 +71,6 @@ object Formats {
       case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse Priority")
     }
   }
-
-  
-
 }
 
 import twin.Device.Priority
@@ -111,65 +112,10 @@ class DeviceTimedOutDeserializer extends StdDeserializer[DeviceTimedOut](DeviceT
   override def deserialize(p: JsonParser, ctxt: DeserializationContext): DeviceTimedOut = DeviceTimedOut
 }
 
-/* import akka.actor._
-  import akka.actor.typed.scaladsl.Behaviors
-  import akka.cluster.Cluster
-  import akka.serialization._
-
-  class PrioritySerializer extends Serializer {
-    val UTF_8 = StandardCharsets.UTF_8.name()
-
-  // If you need logging here, introduce a constructor that takes an ExtendedActorSystem.
-  // class MyOwnSerializer(actorSystem: ExtendedActorSystem) extends Serializer
-  // Get a logger using:
-  // private val logger = Logging(actorSystem, this)
-
-  // This is whether "fromBinary" requires a "clazz" or not
-  def includeManifest: Boolean = true
-
-  // Pick a unique identifier for your Serializer,
-  // you've got a couple of billions to choose from,
-  // 0 - 40 is reserved by Akka itself
-  def identifier = 1234567
-
-  // "toBinary" serializes the given object to an Array of Bytes
-  def toBinary(obj: AnyRef): Array[Byte] = {
-    case _ : Device.Priority.High => "High".getBytes(UTF_8)
-    case _ : Device.Priority.Low => "Low".getBytes(UTF_8)
-
-    // Put the code that serializes the object here
-    //#...
-    
-    //#...
-  }
-
-    
-   
-    
-  
-
-  // "fromBinary" deserializes the given array,
-  // using the type hint (if any, see "includeManifest" above)
-  def fromBinary(bytes: Array[Byte], clazz: Option[Class[_]]): AnyRef = {
-    new String(bytes,UTF_8) match {
-      case "High" => Device.Priority.High
-      case "Low" => Device.Priority.Low
-    }
-    // Put your code that deserializes here
-    //#...
-    //null
-    //#...
-  }
-} */
-
 /**
-  * used for binary serialization https://doc.akka.io/docs/akka/current/serialization.html
+  * marker interface used for binary serialization https://doc.akka.io/docs/akka/current/serialization.html
   */
 trait CborSerializable
 
-/**
-  * used for binary serialization https://doc.akka.io/docs/akka/current/serialization.html
-  */
-//trait PrioritySerializable
 
 

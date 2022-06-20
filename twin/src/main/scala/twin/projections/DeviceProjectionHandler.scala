@@ -28,8 +28,8 @@ class DeviceProjectionHandler(
       case Device.EventDataRecorded(persistenceId,capacity,chargeStatus,deliveredEnergy,deliveredEnergyDate) =>
          val (groupId,deviceId) = Device.getGroupIdDeviceIdFromPersistenceIdString(persistenceId)
          if(deliveredEnergy != 0.0) repo.recordEnergyDeposit(session,groupId,deviceId,deliveredEnergy,deliveredEnergyDate)
-      case Device.EventChargeStatusPrioritySet(persistenceId,priority) => 
-      case _ => log.info("Could not process event of type {}.",envelope.event.toString) 
+      case Device.EventChargeStatusPrioritySet(persistenceId,priority) => // this event does not require a projection
+      case _ => log.warn("Could not process event of type {}.",envelope.event.toString) 
     }
   }
 }

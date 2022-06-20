@@ -56,7 +56,7 @@ object TwinReadsideHttpServer{
       case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
     }
   }
-  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
+  final case class EnergyDepositedRequest(groupId: String, before: LocalDateTime, after: LocalDateTime)
   implicit val energyDepositFormat = jsonFormat3(EnergyDepositedRequest)
 
   final case class DeleteEnergyDepositsRequest(before:LocalDateTime)
@@ -83,9 +83,10 @@ object TwinReadsideHttpServer{
             entity(as[EnergyDepositedRequest]) { energyDepositRequest => 
               val session = new ScalikeJdbcSession() // TODO HERE OR ONCE?
               val pastAsDateTime = energyDepositRequest.after
-              val energyDepositSum = deviceEnergyDepositsRepository.queryEnergyDeposits(session,energyDepositRequest.vppId,energyDepositRequest.before,energyDepositRequest.after) 
+              val energyDepositSum = deviceEnergyDepositsRepository.queryEnergyDeposits(session,energyDepositRequest.groupId,energyDepositRequest.before,energyDepositRequest.after) 
               session.close()
-              complete(EnergyDepositedResult(energyDepositSum))
+              //complete(EnergyDepositedResult(energyDepositSum))
+              complete(HttpResponse(entity = HttpEntity(ContentTypes.`application/json`,EnergyDepositedResult(energyDepositSum).toJson.toString)))
             }
           },
           delete {

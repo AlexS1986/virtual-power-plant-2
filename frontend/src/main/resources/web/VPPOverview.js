@@ -92,7 +92,7 @@ class VPPOverview {
      * @param {*} groupId 
      */
     postUpdateOfDeviceDataFromServer(deviceDataFromServer, groupId) {
-        var keys = Object.keys(deviceDataFromServer)
+        var keys = Object.keys(deviceDataFromServer).sort()
         for (let i = 0; i < keys.length; i++) {
             var deviceId = keys[i]
             var device = deviceDataFromServer[deviceId]
@@ -109,7 +109,7 @@ class VPPOverview {
             }
 
             var dataDescription = device.description
-            if (dataDescription == "chargeStatus") {// data is available
+            if (dataDescription == "chargeStatus") { // data is available
                 var dataValue = device.value.value
 
                 this.deviceSimulatorsToRender[uniqueId].setChargeStatus(dataValue)

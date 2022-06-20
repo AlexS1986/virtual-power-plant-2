@@ -12,19 +12,19 @@ trait DeviceRepository {
       * 
       *
       * @param session session for the readside database
-      * @param vppId the ID of the VPP
+      * @param groupId the ID of the DeviceGroup
       * @param deviceId the ID of the device
       * @param energyDeposit the amount of energy deposited
       * @param timestamp the time of the energy deposit
       */
-    def recordEnergyDeposit(session: ScalikeJdbcSession, vppId: String, deviceId: String, energyDeposit: Double, timestamp: LocalDateTime) : Unit
+    def recordEnergyDeposit(session: ScalikeJdbcSession, groupId: String, deviceId: String, energyDeposit: Double, timestamp: LocalDateTime) : Unit
 }
 
 class DeviceRepositoryImpl() extends DeviceRepository {
-  override def recordEnergyDeposit(session: ScalikeJdbcSession, vppId: String, deviceId: String,  energyDeposit: Double, timestamp: LocalDateTime): Unit = {
+  override def recordEnergyDeposit(session: ScalikeJdbcSession, groupId: String, deviceId: String,  energyDeposit: Double, timestamp: LocalDateTime): Unit = {
       session.db.withinTx { implicit dbSession =>
         sql"""
-            INSERT INTO energy_deposit VALUES($vppId,$deviceId,$timestamp,$energyDeposit)
+            INSERT INTO energy_deposit VALUES($groupId,$deviceId,$timestamp,$energyDeposit)
             ON CONFLICT (vpp_id,device_id,time_stamp) DO UPDATE SET energy_deposited = $energyDeposit
           """.executeUpdate().apply()
       } 

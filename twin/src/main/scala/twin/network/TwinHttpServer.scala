@@ -20,7 +20,7 @@ private[twin] object TwinHttpServer {
         val shutdown = CoordinatedShutdown(classicSystem)
 
         import system.executionContext
-        Http().bindAndHandle(routes, "0.0.0.0", port).onComplete { // IP changed from local host
+        Http().bindAndHandle(routes, "0.0.0.0", port).onComplete { // IP set by Akka 
             case Success(binding) => 
                 val address = binding.localAddress
                 system.log.info(

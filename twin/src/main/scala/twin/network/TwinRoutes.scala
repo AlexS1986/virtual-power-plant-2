@@ -25,10 +25,8 @@ import scala.util.Failure
 import twin._
 
 import java.time.LocalDateTime
-//import java.time.format.DateTimeFormatter
 import twin.Device.Priority.High
 import twin.Device.Priority.Low
-
 
 
 private[twin] final class TwinRoutes(
@@ -36,12 +34,11 @@ private[twin] final class TwinRoutes(
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
 ) {
   import Formats.localDateTimeFormat
-
   import Formats.priorityFormat
 
-  val readsideHost = system.settings.config.getConfig("readside").getString("host")
-  val readsidePort = system.settings.config.getConfig("readside").getString("port")
-  val routeToReadside = "http://" + readsideHost + ":" + readsidePort  + "/twin-readside"
+  //val readsideHost = system.settings.config.getConfig("readside").getString("host")
+  //val readsidePort = system.settings.config.getConfig("readside").getString("port")
+  //val routeToReadside = "http://" + readsideHost + ":" + readsidePort  + "/twin-readside"
 
   /**
     * represents the body of a http-request to request a certain total energy output
@@ -64,7 +61,7 @@ private[twin] final class TwinRoutes(
   implicit val desiredChargeStatusMessageFormat = jsonFormat3(DesiredChargeStatusMessage)
 
   /**
-    * represents the body of a http-request that identifies a device
+    * represents the body of a http-request that identifies a Device
     *
     * @param deviceId
     * @param groupId
@@ -72,18 +69,20 @@ private[twin] final class TwinRoutes(
   final case class DeviceIdentifier(deviceId: String, groupId: String)
   implicit val deviceIdentifierFormat = jsonFormat2(DeviceIdentifier)
 
-  final case class RecordData(groupId: String, deviceId: String, capacity: Double, chargeStatus: Double, deliveredEnergy: Double, deliveredEnergyDate: LocalDateTime)
-  
-  implicit val recordDataFormat = jsonFormat6(RecordData)
 
   /**
-    * represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
+    * represents the body of a http-request to record data for a Device
     *
-    * @param groupId
-    * @param before
-    * @param after
+    * @param groupId the DeviceGroup 
+    * @param deviceId the ID of the Device
+    * @param capacity the current capacity of the Device
+    * @param chargeStatus the current charge status of the Device
+    * @param deliveredEnergy the energy emitted to the grid
+    * @param deliveredEnergyDate the date time at which the energy was emitted to the grid
     */
-  
+  final case class RecordData(groupId: String, deviceId: String, capacity: Double, chargeStatus: Double, deliveredEnergy: Double, deliveredEnergyDate: LocalDateTime)
+  implicit val recordDataFormat = jsonFormat6(RecordData)
+
   /**
     * represents the body of a http-request that identifies a DeviceGroup
     *
@@ -119,6 +118,14 @@ private[twin] final class TwinRoutes(
       Some(deviceManagers((math.random() * deviceManagers.size).toInt))
     }
   }
+
+  // settings for ask pattern in synchronous call
+  import akka.util.Timeout
+  import akka.actor.typed.scaladsl.AskPattern._
+  import scala.concurrent.duration._
+  import scala.concurrent.{ExecutionContext, Future}
+  implicit val timeout: Timeout = 5.seconds
+  implicit val actorSystem      = system
  
   val devices: Route =
     concat(
@@ -136,13 +143,6 @@ private[twin] final class TwinRoutes(
         post {
           entity(as[DeviceIdentifier]) { 
             deviceIdentifier =>
-              import akka.util.Timeout
-              import akka.actor.typed.scaladsl.AskPattern._
-              import scala.concurrent.duration._
-              import scala.concurrent.{ExecutionContext, Future}
-              implicit val timeout: Timeout = 5.seconds
-              implicit val actorSystem      = system
-
               val deviceManagerOption : Option[ActorRef[DeviceManager.Command]] = getDeviceManager
               deviceManagerOption match {
                 case Some(deviceManager) => deviceManager.ask(replyTo =>  DeviceManager.RequestTrackDevice(deviceIdentifier.groupId,deviceIdentifier.deviceId, replyTo)) // TODO: handling of response required?
@@ -204,13 +204,6 @@ private[twin] final class TwinRoutes(
           get {
             entity((as[DeviceIdentifier])) { deviceIdentifier =>
               onComplete{
-                import akka.util.Timeout
-                import akka.actor.typed.scaladsl.AskPattern._
-                import scala.concurrent.duration._
-                import scala.concurrent.{ExecutionContext, Future}
-                implicit val timeout: Timeout = 5.seconds
-                implicit val actorSystem      = system
-
                 val result = getDeviceManager match {
                   case Some(deviceManager) => 
                     deviceManager
@@ -259,13 +252,6 @@ private[twin] final class TwinRoutes(
         get {
           entity(as[GroupIdentifier]) { groupIdentifier => 
             onComplete {
-              import akka.util.Timeout
-              import akka.actor.typed.scaladsl.AskPattern._
-              import scala.concurrent.duration._
-              import scala.concurrent.{ExecutionContext, Future}
-              implicit val timeout: Timeout = 5.seconds
-              implicit val actorSystem      = system
-
               val result = getDeviceManager match {
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
                   DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo))  
@@ -284,4 +270,7 @@ private[twin] final class TwinRoutes(
         }
       },
     )
+
 }
+
+

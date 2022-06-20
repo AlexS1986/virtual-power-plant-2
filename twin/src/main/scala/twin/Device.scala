@@ -150,21 +150,12 @@ object Device {
     deliveredEnergyDate: LocalDateTime,
   ) extends Event with CborSerializable
 
-  //import com.fasterxml.jackson.annotation._
-  /** 
-    * determines which messages the Device will accept and process
-    */
-  /* @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-  @JsonSubTypes(
-  Array(
-    new JsonSubTypes.Type(value = classOf[Device.Priority.High], name = "High"),
-    new JsonSubTypes.Type(value = classOf[Device.Priority.Low], name = "Low"))) */
-  
-
-
-@JsonSerialize(`using` = classOf[PriorityJsonSerializer])
-@JsonDeserialize(`using` = classOf[PriorityJsonDeserializer])
-sealed trait Priority {
+  /**
+    * A Priority defines which messages a Device will process and which ones it will ignore
+  */
+  @JsonSerialize(`using` = classOf[PriorityJsonSerializer])
+  @JsonDeserialize(`using` = classOf[PriorityJsonDeserializer])
+  sealed trait Priority {
     def > (o: Priority) : Boolean = {
       this match {
         case Priority.High => if(o == Priority.Low) true else false 
@@ -174,16 +165,10 @@ sealed trait Priority {
   }
   
   final object Priority {
-    final case object High extends Priority //with CSerializable
-    final case object Low extends Priority //with PrioritySerializable
+    final case object High extends Priority 
+    final case object Low extends Priority 
   }
 
-
-
- 
-
-  
-  
   /**
     * triggered if the priority level is changed
     *
@@ -274,7 +259,7 @@ sealed trait Priority {
     def getNewBehaviour(groupId: String, deviceId: String, lastChargeStatusReading: Option[Double]): Behavior[Command] = {
       
       /**
-        * helper function that returns an Effect that persists an EventDataRecorded event and sends a response
+        * helper function that returns an Effect that persists an EventDataRecorded event 
         *
         * @param persistenceId
         * @param cmd
@@ -282,7 +267,6 @@ sealed trait Priority {
         */
       def recordData(persistenceId: String,cmd: RecordData): Effect[Event, State] = {
         Effect.persist(EventDataRecorded(persistenceId,cmd.capacity,cmd.chargeStatus,cmd.deliveredEnergy, cmd.deliveredEnergyDate))
-          //.thenRun(state => cmd.replyTo ! DataRecorded(cmd.requestId) )
       }
 
       /**
@@ -316,7 +300,7 @@ sealed trait Priority {
                     Effect.none.thenRun(state => state match {
                       case currentState : DeviceState => replyTo ! RespondData(deviceId,currentState,getHostName())
                     })
-                  case StopDevice => Effect.none.thenRun{ //TODO should also use change state to stopped? which would be handled by 
+                  case StopDevice => Effect.none.thenRun{ 
                     state => 
                       implicit val system : ActorSystem[_] = context.system
                       HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.StopHardwareDevice(groupId,deviceId))
@@ -346,16 +330,19 @@ sealed trait Priority {
                     priority match {
                       case High => Effect.none
                       case Low => Effect.none.thenRun { state => (lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head) match {
-                        case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => //val desiredChargeStatus = -deltaEnergyOutput/capacity + currentChargeStatus   
-                                                          val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
-                                                          val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus  
-                                                          
-                                                          val upperBound = 1.0
-                                                          val lowerBound = 0.0
-                                                          val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction  
-                                                          val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
-                                                          implicit val system : ActorSystem[_] = context.system
-                                                          HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,desiredChargeStatus))
+                        case (List(Some(lastButOneChargeStatus),Some(lastChargeStatus)), Some(lastDeliveredEnergyReading)) => 
+                            def computeDesiredChargeStatus(deltaEnergyOutput: Double, lastButOneChargeStatus: Double, lastChargeStatus: Double, lastDeliveredEnergyReading: Double) : Double = {
+                              val chargeStatusChangesAtZeroLocalProduction =  -deltaEnergyOutput/capacity 
+                              val chargeStatusChangesCorrectionForLocalEnergyProduction = lastChargeStatus - lastButOneChargeStatus                           
+                              val upperBound = 1.0
+                              val lowerBound = 0.0
+                              val desiredChargeStatusTmp = lastChargeStatus + chargeStatusChangesAtZeroLocalProduction + chargeStatusChangesCorrectionForLocalEnergyProduction  
+                              val desiredChargeStatus = math.min(math.max(lowerBound,desiredChargeStatusTmp),upperBound)
+                              desiredChargeStatus
+                            } 
+                                                         
+                            implicit val system: ActorSystem[_] = context.system
+                            HardwareCommunicator.sendDeviceCommand(HardwareCommunicator.SetDesiredChargeStatusAtHardware(deviceId,groupId,computeDesiredChargeStatus(deltaEnergyOutput,lastButOneChargeStatus, lastChargeStatus,lastDeliveredEnergyReading)))
                         case (List(_,_),_) => context.log.info(s"Cannot handle DesiredDeltaEnergyOutput message at $deviceId since prerequisites are not met ${(lastChargeStatusReading, lastTenDeliveredEnergyReadings.reverse.head).toString()}")
                     }
                   }

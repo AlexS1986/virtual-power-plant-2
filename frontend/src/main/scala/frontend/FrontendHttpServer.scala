@@ -46,11 +46,11 @@ object FrontendHttpServer {
   /**
     * represents the body of a http-request to obtain the energy deposited in a VPP in a timespan
     *
-    * @param vppId
+    * @param groupId
     * @param before
     * @param after
     */
-  final case class EnergyDepositedRequest(vppId: String, before: LocalDateTime, after: LocalDateTime)
+  final case class EnergyDepositedRequest(groupId: String, before: LocalDateTime, after: LocalDateTime)
   //https://stackoverflow.com/questions/43881969/de-serializing-localdatetime-with-akka-http?rq=1
   implicit val localDateTimeFormat = new JsonFormat[LocalDateTime] {
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss") //DateTimeFormatter.ISO_DATE_TIME
@@ -181,7 +181,7 @@ object FrontendHttpServer {
           }
       },
       
-      path("vpp" / Segment / "desired-total-energy-output") { vppId =>
+      path("vpp" / Segment / "desired-total-energy-output") { groupId =>
         post {
           entity(as[TotalDesiredEnergyOutputMessage]) { totalDesiredEnergyOutputMessage => 
             sendHttpRequest(totalDesiredEnergyOutputMessage.toJson,routeToTwin+"/desired-total-energy-output", HttpMethods.POST)
@@ -189,7 +189,7 @@ object FrontendHttpServer {
           }
         }
       },
-      path("vpp" / Segment / "energies" / "delete" ) { vppId  => 
+      path("vpp" / Segment / "energies" / "delete" ) { groupId  => 
         post {
           entity(as[DeleteEnergyDepositsRequest]) { deleteEnergyDepositsRequest => 
             sendHttpRequest(deleteEnergyDepositsRequest.toJson,routeToReadside+"/energies",HttpMethods.DELETE)
@@ -197,7 +197,7 @@ object FrontendHttpServer {
           }
         }
       },
-      path("vpp" / Segment / "energies") { vppId => 
+      path("vpp" / Segment / "energies") { groupId =>  // TODO replace groupId by groupId everywhere
         get {
           parameter("before") { before => 
             parameter("after") { after => 
@@ -208,7 +208,7 @@ object FrontendHttpServer {
                 dates match {
                   case Failure(exception) => throw new Exception(exception)
                   case Success((before,after)) => {
-                    sendHttpRequest(EnergyDepositedRequest(vppId,before,after).toJson,routeToReadside+"/energies",HttpMethods.GET)
+                    sendHttpRequest(EnergyDepositedRequest(groupId,before,after).toJson,routeToReadside+"/energies",HttpMethods.GET)
                   }
                 }
               }{
@@ -219,20 +219,20 @@ object FrontendHttpServer {
           }
         }
       },
-      path("vpp" / Segment) { vppId => 
+      path("vpp" / Segment) { groupId => 
         get {
           onComplete{
-            sendHttpRequest(VppIdentifier(vppId).toJson,routeToTwin+"/data-all",HttpMethods.GET)
+            sendHttpRequest(VppIdentifier(groupId).toJson,routeToTwin+"/data-all",HttpMethods.GET)
           }{
             case Success(result) => complete(result)
             case Failure(exception) => complete(StatusCodes.InternalServerError,s"An error occurred: ${exception.getMessage}")
           }
         }
       },
-      path("vpp" / "device" / Segment / Segment / "details") { (vppId, deviceId) =>
+      path("vpp" / "device" / Segment / Segment / "details") { (groupId, deviceId) =>
         get {
           onComplete{
-            val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
+            val deviceIdentifier = DeviceIdentifier(deviceId,groupId)
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
           }{                           
             case Success(httpResponse) => 
@@ -240,7 +240,7 @@ object FrontendHttpServer {
                 val deviceDataF = Unmarshal(httpResponse).to[DeviceData]
                 deviceDataF
               } {
-                case Success(deviceData) => val twirlPage = html.testTwirl(vppId,deviceId,deviceData)
+                case Success(deviceData) => val twirlPage = html.testTwirl(groupId,deviceId,deviceData)
                   complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, twirlPage.toString))
                 case Failure(exception) => complete(StatusCodes.InternalServerError, s"An error occurred: ${exception.getMessage}")
               }                                 
@@ -248,10 +248,10 @@ object FrontendHttpServer {
           }
         }
       },
-      path ("vpp" / "device" / Segment / Segment ) { (vppId, deviceId) => // get particular device data in twin service
+      path ("vpp" / "device" / Segment / Segment ) { (groupId, deviceId) => // get particular device data in twin service
         concat( get {
           onComplete{
-            val deviceIdentifier = DeviceIdentifier(deviceId,vppId)
+            val deviceIdentifier = DeviceIdentifier(deviceId,groupId)
             sendHttpRequest(deviceIdentifier.toJson,routeToTwin+"/data",HttpMethods.GET)
           }{                           
             case Success(httpResponse) => complete(httpResponse)                          
@@ -259,27 +259,27 @@ object FrontendHttpServer {
           }
         },
         delete {
-            sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToTwin+"/stop",HttpMethods.POST)
+            sendHttpRequest(DeviceIdentifier(deviceId,groupId).toJson,routeToTwin+"/stop",HttpMethods.POST)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for STOP in simulator."))
         })
       },
-      path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (vppId,deviceId) =>
+      path ("vpp" / "device" / Segment / Segment / "charge-status" ) { (groupId,deviceId) =>
         concat(
           post {
             entity(as[DesiredChargeStatusBody]) { desiredChargeStatusBody =>
-              sendHttpRequest(DesiredChargeStatusMessageBody(vppId, deviceId, desiredChargeStatusBody.desiredChargeStatus).toJson,routeToTwin+"/charge-status",HttpMethods.POST)
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to set charge status of device $deviceId of VPP $vppId to ${desiredChargeStatusBody.desiredChargeStatus} received."))
+              sendHttpRequest(DesiredChargeStatusMessageBody(groupId, deviceId, desiredChargeStatusBody.desiredChargeStatus).toJson,routeToTwin+"/charge-status",HttpMethods.POST)
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to set charge status of device $deviceId of VPP $groupId to ${desiredChargeStatusBody.desiredChargeStatus} received."))
             }
           },
           delete {
-              sendHttpRequest(DeviceIdentifier(deviceId, vppId).toJson,routeToTwin+"/charge-status/priority/reset",HttpMethods.POST)
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to release manual charge status specification of device $deviceId in VPP $vppId received"))
+              sendHttpRequest(DeviceIdentifier(deviceId, groupId).toJson,routeToTwin+"/charge-status/priority/reset",HttpMethods.POST)
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"Request to release manual charge status specification of device $deviceId in VPP $groupId received"))
           }
         )
       },
-      path("simulator" / Segment / Segment / "start") { (vppId,deviceId) => 
+      path("simulator" / Segment / Segment / "start") { (groupId,deviceId) => 
         post {
-          sendHttpRequest(DeviceIdentifier(deviceId,vppId).toJson,routeToSimulator+"/start",HttpMethods.POST)
+          sendHttpRequest(DeviceIdentifier(deviceId,groupId).toJson,routeToSimulator+"/start",HttpMethods.POST)
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "Device "+deviceId+ " requested for START in simulator."))
         } 
       },

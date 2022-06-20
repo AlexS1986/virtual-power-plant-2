@@ -45,6 +45,8 @@ import scala.util.Failure
 import scala.util.Success
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.persistence.typed.scaladsl.RetentionCriteria
+import com.typesafe.config.Config
+import scala.concurrent.ExecutionContextExecutor
 //import twin.network.DeviceRoutes
 
 /** represents a group of Devices, i.e. digital twins of hardware. Thus, it represents a Virtual
@@ -305,29 +307,78 @@ object DeviceGroup {
                       )
                     )
                     .thenRun { state => }
-                case AdjustTotalEnergyOutput =>
+                case AdjustTotalEnergyOutput => 
                   Effect.none.thenRun { state =>
                     import Formats.localDateTimeFormat
-                    import Formats.{
-                      energyDepositedFormat,
-                      energyDepositedResponseFormat,
-                      EnergyDepositedRequest,
-                      EnergyDepositedResponse
-                    }
-                    val now    = LocalDateTime.now()
-                    val before = now.minusSeconds(2)
-                    val after  = now.minusSeconds(12)
-                    val readsideHost =
-                      context.system.settings.config.getConfig("readside").getString("host")
-                    val readsidePort =
-                      context.system.settings.config.getConfig("readside").getString("port")
-                    val routeToReadside =
-                      "http://" + readsideHost + ":" + readsidePort + "/twin-readside"
+                    import Formats.TwinReadSideFormats._ 
 
                     implicit val actorSystem = context.system
-                    val httpResponseFuture = sendHttpRequest(
-                      EnergyDepositedRequest(groupId, before, after).toJson,
-                      routeToReadside + "/energies",
+
+                    def getRouteToReadSideEnergyDepositedRequest(context: ActorContext[DeviceGroup.Command]) : String = {
+                      val readsideHost =
+                        context.system.settings.config.getConfig("readside").getString("host")
+                      val readsidePort =
+                        context.system.settings.config.getConfig("readside").getString("port")
+                      "http://" + readsideHost + ":" + readsidePort + "/twin-readside" + "/energies"
+                    }
+
+                    def computeEnergyDepositedRequest() : EnergyDepositedRequest = {
+                       val now    = LocalDateTime.now()
+                       val before = now.minusSeconds(2)
+                       val after  = now.minusSeconds(12)
+                       EnergyDepositedRequest(groupId, before, after)
+                    }
+
+                    def handleEnergyDepositedResponse(httpResponse: HttpResponse)(implicit executionContext: ExecutionContextExecutor) = {
+                      def computeDeltaEnergyOutputPerDevice(currentTotalEnergyOutput: Double, relaxationParameter: Double, numberOfDevices: Int) : Option[Double] = {
+                        if ((numberOfDevices > 0) && relaxationParameter != 0.0) {
+                          val newEnergyOutput = (desiredTotalEnergyOutput - currentTotalEnergyOutput) / relaxationParameter + currentTotalEnergyOutput
+                          val deltaEnergyOutput = newEnergyOutput - currentTotalEnergyOutput
+                          val deltaEnergyOutputPerDevice = deltaEnergyOutput / devicesRegistered.size.toDouble
+                          Some(deltaEnergyOutputPerDevice)        
+                        } else {
+                          None
+                        }
+                      }
+
+                      def notifyDevices(deltaEnergyOutputPerDevice: Double) = {
+                        for (dId <- devicesRegistered) {
+                          val device = sharding.entityRefFor(
+                            Device.TypeKey,
+                            Device.makeEntityId(groupId, dId)
+                          )
+                          device ! Device.DesiredDeltaEnergyOutput(
+                            deltaEnergyOutputPerDevice
+                          )
+                        }
+                      }
+
+                      val energyDepositedResponseF =
+                          Unmarshal(httpResponse).to[EnergyDepositedResponse]
+                        energyDepositedResponseF.onComplete {
+                          case Success(energyDepositedResponse) =>
+                            energyDepositedResponse.energyDeposited match {
+                              case Some(currentEnergyOutput) =>
+                                computeDeltaEnergyOutputPerDevice(currentEnergyOutput, relaxationParameter, devicesRegistered.size) match {
+                                  case Some(deltaEnergyOutputPerDevice) => 
+                                    notifyDevices(deltaEnergyOutputPerDevice)
+                                  case None => // do nothing
+                                }
+                              case None =>
+                                println(
+                                  "[WARN] Request to readside failed. No current energy output recorded."
+                                ) // not context.log because not thread safe and this is executed in a future outside a thread
+                            }
+                          case Failure(exception) =>
+                            println(
+                              s"[ERROR]: Request to readside failed. Could not determine current total energy output. Error message: $exception"
+                            )
+                        }
+                    }
+
+                    val httpResponseFuture = NetworkCommunicator.sendHttpRequest(
+                      computeEnergyDepositedRequest().toJson,
+                      getRouteToReadSideEnergyDepositedRequest(context),
                       HttpMethods.GET
                     )
 
@@ -335,39 +386,7 @@ object DeviceGroup {
                     httpResponseFuture.onComplete {
                       case Failure(exception) =>
                       case Success(httpResponse) =>
-                        val energyDepositedResponseF =
-                          Unmarshal(httpResponse).to[EnergyDepositedResponse]
-                        energyDepositedResponseF.onComplete {
-                          case Success(energyDepositedResponse) =>
-                            energyDepositedResponse.energyDeposited match {
-                              case Some(currentEnergyOutput) =>
-                                if (!devicesRegistered.isEmpty && relaxationParameter != 0.0) {
-                                  val newEnergyOutput =
-                                    (desiredTotalEnergyOutput - currentEnergyOutput) / relaxationParameter + currentEnergyOutput
-                                  val deltaEnergyOutput = newEnergyOutput - currentEnergyOutput
-                                  val deltaEnergyOutputPerDevice =
-                                    deltaEnergyOutput / devicesRegistered.size.toDouble
-
-                                  for (dId <- devicesRegistered) {
-                                    val device = sharding.entityRefFor(
-                                      Device.TypeKey,
-                                      Device.makeEntityId(groupId, dId)
-                                    )
-                                    device ! Device.DesiredDeltaEnergyOutput(
-                                      deltaEnergyOutputPerDevice
-                                    )
-                                  }
-                                }
-                              case None =>
-                                context.log.error(
-                                  "Request to readside failed. No current energy output recorded "
-                                )
-                            }
-                          case Failure(exception) =>
-                            context.log.error(
-                              "Request to readside failed. Could not determine current total energy output."
-                            )
-                        }
+                        handleEnergyDepositedResponse(httpResponse)
                     }
                   }
                 case ResetPriority(deviceId) =>
@@ -471,7 +490,8 @@ object DeviceGroup {
     getNewBehaviour()
   }
 
-  /** Sends a request asynchronously
+  object NetworkCommunicator {
+    /** Sends a request asynchronously
     *
     * @param content
     *   the http-body
@@ -483,20 +503,22 @@ object DeviceGroup {
     *   the actor system that handles the request
     * @return
     */
-  private def sendHttpRequest(content: JsValue, uri: String, method: HttpMethod)(implicit
-      system: ActorSystem[_]
-  ): Future[HttpResponse] = {
-    val request = HttpRequest(
-      method = method,
-      uri = uri,
-      entity = HttpEntity(
-        contentType = ContentTypes.`application/json`,
-        content.toString
+    def sendHttpRequest(content: JsValue, uri: String, method: HttpMethod)(implicit
+        system: ActorSystem[_]
+    ): Future[HttpResponse] = {
+      val request = HttpRequest(
+        method = method,
+        uri = uri,
+        entity = HttpEntity(
+          contentType = ContentTypes.`application/json`,
+          content.toString
+        )
       )
-    )
-    val responseFuture: Future[HttpResponse] =
-      Http().singleRequest(request)
-    responseFuture
+      val responseFuture: Future[HttpResponse] =
+        Http().singleRequest(request)
+      responseFuture
+    }
   }
+  
 
 }
