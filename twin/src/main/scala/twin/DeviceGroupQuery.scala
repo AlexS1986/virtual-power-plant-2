@@ -55,30 +55,7 @@ object DeviceGroupQuery {
     */
   private final case class WrappedRespondData(response: Device.RespondData) extends Command with CborSerializable
 
-  /**
-    * required to read and write objects of a type with multiple subtypes
-    */
-  implicit object ChargeStatusReadingJsonWriter extends RootJsonFormat[ChargeStatusReading] {
-    def write(ChargeStatusReading: ChargeStatusReading) : JsValue = {
-      ChargeStatusReading match {
-        case DeviceData(value,currentHost) => JsObject("value" -> JsObject("value" -> value.toJson, "currentHost" -> currentHost.toJson),"description" -> "chargeStatus".toJson)
-        case DataNotAvailable => JsObject("value" -> "".toJson, "description" -> "chargeStatus not available".toJson)
-        case DeviceTimedOut => JsObject("value" -> "".toJson, "description" -> "device timed out".toJson)
-      }
-    }
-                                  
-    def read(json : JsValue) : ChargeStatusReading = {
-      json.asJsObject.getFields("description") match {
-        case Seq(JsString(description)) if description == "chargeStatus" => json.asJsObject.getFields("value") match { 
-          case Seq(JsNumber(value), JsString(currentHost)) => DeviceData(value.toDouble, currentHost)
-          case _ => throw new DeserializationException("Double expected.")
-        }
-        case Seq(JsString(description)) if description == "chargeStatus not available" => DataNotAvailable 
-        case Seq(JsString(description)) if description == "device timed out" => DeviceTimedOut
-        case _ => throw new DeserializationException("chargeStatus reading expected.")
-      }
-    } 
-  } 
+   
 
   /**
     * this type defines the status of Devices that are queried by this actor
@@ -103,7 +80,7 @@ object DeviceGroupQuery {
   /**
     * Data has not been reported completely yet at the Device
     */
-  @JsonDeserialize(`using` = classOf[DataNotAvailableDeserializer])
+  @JsonDeserialize(`using` = classOf[Formats.DeviceGroupQueryFormats.DataNotAvailableDeserializer])
   sealed trait DataNotAvailable
   @JsonTypeName("dataNotAvailable")
   case object DataNotAvailable extends ChargeStatusReading with DataNotAvailable 
@@ -111,7 +88,7 @@ object DeviceGroupQuery {
   /**
     * this Device has not responded in time
     */
-  @JsonDeserialize(`using` = classOf[DeviceTimedOutDeserializer])
+  @JsonDeserialize(`using` = classOf[Formats.DeviceGroupQueryFormats.DeviceTimedOutDeserializer])
   sealed trait DeviceTimedOut
   @JsonTypeName("deviceTimedOut")
   case object DeviceTimedOut extends ChargeStatusReading with DeviceTimedOut 

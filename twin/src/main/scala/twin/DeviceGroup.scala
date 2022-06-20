@@ -47,7 +47,6 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.persistence.typed.scaladsl.RetentionCriteria
 import com.typesafe.config.Config
 import scala.concurrent.ExecutionContextExecutor
-//import twin.network.DeviceRoutes
 
 /** represents a group of Devices, i.e. digital twins of hardware. Thus, it represents a Virtual
   * Power Plant.

@@ -34,7 +34,7 @@ private[twin] final class TwinRoutes(
     implicit val deviceManagers: Seq[ActorRef[DeviceManager.Command]],
 ) {
   import Formats.localDateTimeFormat
-  import Formats.priorityFormat
+  import Formats.DeviceFormats.priorityFormat
 
   //val readsideHost = system.settings.config.getConfig("readside").getString("host")
   //val readsidePort = system.settings.config.getConfig("readside").getString("port")
@@ -256,7 +256,7 @@ private[twin] final class TwinRoutes(
                 case Some(deviceManager) => deviceManager.ask((replyTo: ActorRef[DeviceGroup.RespondAllData]) =>
                   DeviceManager.RequestAllData(groupIdentifier.groupId,replyTo))  
                   .map {
-                    import DeviceGroupQuery.ChargeStatusReadingJsonWriter
+                    import Formats.DeviceGroupQueryFormats.ChargeStatusReadingJsonWriter
                     respondData => respondData.data.toJson.toString   
                   }
                 case None => throw new Exception("Internal server error")

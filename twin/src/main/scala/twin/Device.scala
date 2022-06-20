@@ -153,8 +153,8 @@ object Device {
   /**
     * A Priority defines which messages a Device will process and which ones it will ignore
   */
-  @JsonSerialize(`using` = classOf[PriorityJsonSerializer])
-  @JsonDeserialize(`using` = classOf[PriorityJsonDeserializer])
+  @JsonSerialize(`using` = classOf[Formats.DeviceFormats.PriorityJsonSerializer])
+  @JsonDeserialize(`using` = classOf[Formats.DeviceFormats.PriorityJsonDeserializer])
   sealed trait Priority {
     def > (o: Priority) : Boolean = {
       this match {
