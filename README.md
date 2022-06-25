@@ -21,6 +21,6 @@ kubectl create secret -n iot-system-1 generic postgresql-readside-env \
 4. install the database tables in twin/create_user_tables.sql twin/create_journal_tables_only_ws_event_scing.sql in the postgresql-readside database
 5. install the database tables twin/create_journal_tables_only_ws_event_scing.sql in the postgresql database
 6. run the installation script twin/restart.sh simulator/restart.sh twin-readside/restart.sh frontend/restart.sh
-7. open minikubeIP:30408 in the browser, there minikubeIP is the IP of the minikube cluster or the external ip of the frontend microservice
+7. open minikubeIP:30408 in the browser, there minikubeIP is the IP of the minikube cluster or the external ip of the frontend microservice's external service
 8. Navigate the web interface to test the application
 
