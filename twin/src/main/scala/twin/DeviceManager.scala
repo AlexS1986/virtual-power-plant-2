@@ -145,7 +145,7 @@ class DeviceManager(context: ActorContext[DeviceManager.Command])
       case RequestUnTrackDevice(groupId, deviceId) => 
         context.log.info(s"[RequestUnTrackDevice($groupId,$deviceId) received]")
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)
-        group ! DeviceGroup.RequestUnTrackDevice(deviceId) // Rename everything to DeviceTerminated?
+        group ! DeviceGroup.RequestUnTrackDevice(deviceId) 
         this
       case StopDevice(deviceId, groupId) => 
         val group  = sharding.entityRefFor(DeviceGroup.TypeKey, groupId)

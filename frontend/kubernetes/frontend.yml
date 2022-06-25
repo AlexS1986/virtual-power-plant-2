@@ -53,3 +53,28 @@ spec:
 #    - protocol: TCP
 #      port: 30080
 #      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: frontend
+  name: frontend-service
+  namespace: iot-system-1
+spec:
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: port-1
+    nodePort: 30408
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: frontend
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}

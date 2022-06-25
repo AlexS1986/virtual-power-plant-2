@@ -1,11 +1,11 @@
 #!/bin/bash
-#call as ./performance.sh not as sh performance.sh https://stackoverflow.com/questions/2462317/bash-syntax-error-redirection-unexpected
+#call as ./performance.sh numberOfDevices not as sh performance.sh https://stackoverflow.com/questions/2462317/bash-syntax-error-redirection-unexpected
 
 kubectl config set-context --current --namespace=iot-system-1
 http_port_frontend=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
 http_port_twin=$(kubectl get service | grep "iot-system-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
 
-numberOfDevices=3000
+numberOfDevices=$1
 numberRequests=10
 timeAllowedPerRequest=2.0
 timeAllowedForUpdateToSingleDeviceRegisteredAtServer=2.0
@@ -27,7 +27,7 @@ do
             notAllFound=1
             deviceName="device$i"
             startString='simulator/default/'$deviceName'/start'
-            echo $(curl -s -XPOST http://192.168.49.2:$http_port_frontend/$startString)
+            curl -s -XPOST http://192.168.49.2:$http_port_frontend/$startString 1> /dev/null
         fi
     done
 
@@ -60,7 +60,7 @@ do
     # get server time for request
     response=$(curl -s -w 'time_starttransfer %{time_starttransfer} time_pretransfer %{time_pretransfer}' -XGET http://192.168.49.2:$http_port_frontend/vpp/default)
     #echo $response
-    numberTwinPods=$(kubectl get pod | grep -c 'twin-[[:alnum:]]\{9\}-[[:alnum:]]\{5\}')
+    numberTwinPods=$(kubectl get pod | grep -c 'twin-[[:alnum:]]\+-[[:alnum:]]\+')
     echo "The number of twin pods is $numberTwinPods for request $(($j+1))."
     #https://stackoverflow.com/questions/40519902/how-to-store-value-from-grep-output-in-variable
     time_starttransfer="$(echo $response | grep -Eo 'time_starttransfer [0-9]+\,[0-9]+' | grep -Eo '[0-9]+\,[0-9]+')"
@@ -142,7 +142,7 @@ for i in `seq 0 $numberOfDevices`
 do
     deviceName="device$i"
     stopString='vpp/device/default/'$deviceName
-    echo $(curl -s -XDELETE http://192.168.49.2:$http_port_frontend/$stopString) 
+    curl -s -XDELETE http://192.168.49.2:$http_port_frontend/$stopString 1> /dev/null 
 done
 
 # stop test device
@@ -155,7 +155,7 @@ do
     if  grep -q "$deviceName" <<< "$response"; then
             echo "Response contains $deviceName try to stop."
             deviceUpdateTimeFound=1
-            echo $(curl -s -XPOST http://192.168.49.2:$http_port_twin/twin/untrack-device -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "deviceUpdateTime"}')
+            curl -s -XPOST http://192.168.49.2:$http_port_twin/twin/untrack-device -H "Content-Type: application/json" --data '{"groupId":"default","deviceId": "deviceUpdateTime"}' 1> /dev/null
     fi
     sleep 1s
 done

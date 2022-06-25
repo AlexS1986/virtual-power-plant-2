@@ -86,7 +86,6 @@ object Formats {
       }
     }
 
-    //import DeviceGroupQuery._
     class DataNotAvailableDeserializer
         extends StdDeserializer[DataNotAvailable](DataNotAvailable.getClass) {
       // whenever we need to deserialize an instance of Unicorn trait, we return the object Unicorn
@@ -94,8 +93,7 @@ object Formats {
         DataNotAvailable
     }
 
-//https://doc.akka.io/docs/akka/current/serialization-jackson.html
-    //import DeviceGroupQuery._
+    //https://doc.akka.io/docs/akka/current/serialization-jackson.html
     class DeviceTimedOutDeserializer
         extends StdDeserializer[DeviceTimedOut](DeviceTimedOut.getClass) {
       // whenever we need to deserialize an instance of Unicorn trait, we return the object Unicorn
@@ -105,13 +103,15 @@ object Formats {
   }
 
   object DeviceFormats {
+    import twin.Device.Priority
+    import twin.Device.Priority._
 
     /** serialization of Device.Priority
       */
-    import Device.Priority.High
-    import Device.Priority.Low
-    implicit val priorityFormat = new JsonFormat[Device.Priority] {
-      def write(x: Device.Priority) = x match {
+    //import Device.Priority.High
+    //import Device.Priority.Low
+    implicit val priorityFormat = new JsonFormat[Priority] {
+      def write(x: Priority) = x match {
         case High => JsString("High")
         case Low  => JsString("Low")
       }
@@ -129,9 +129,6 @@ object Formats {
           )
       }
     }
-
-    import twin.Device.Priority
-    import twin.Device.Priority._
 
     class PriorityJsonSerializer extends StdSerializer[Priority](classOf[Priority]) {
       override def serialize(
