@@ -25,3 +25,8 @@ kubectl create secret -n iot-system-1 generic postgresql-readside-env \
 8. open minikubeIP:30408 in the browser, there minikubeIP is the IP of the minikube cluster or the external ip of the frontend microservice's external service
 9. Navigate the web interface to test the application
 
+#####################################################
+
+The folder UML-Diagrams contains several UML diagrams that document the structure and behavior of the IoT prototype and the simulator application. The diagrams can be opened with the freely testable software StarUML, see https://staruml.io. 
+
+The diagrams are organized in Requirement-, Analysis-, and Design diagrams which become increasingly more detailed.
