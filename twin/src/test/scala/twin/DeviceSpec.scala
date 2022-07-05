@@ -1,5 +1,6 @@
 //#full-example
 //https://sgeb.io/posts/sbt-testonly/
+// run as sbt testOnly *DeviceSpec
 package twin
 
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
