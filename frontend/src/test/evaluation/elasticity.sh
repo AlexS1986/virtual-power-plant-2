@@ -1,4 +1,5 @@
 #!/bin/bash
+# This script runs tests for the elasticity of the IoT applications
 #call as ./elasticity.sh numberOfDevices, where numberOfDevices is the initial number of simulated batteries. not as sh elasticity.sh https://stackoverflow.com/questions/2462317/bash-syntax-error-redirection-unexpected
 kubectl config set-context --current --namespace=iot-system-1
 export http_port_frontend=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')

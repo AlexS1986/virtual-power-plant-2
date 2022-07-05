@@ -30,3 +30,8 @@ kubectl create secret -n iot-system-1 generic postgresql-readside-env \
 The folder UML-Diagrams contains several UML diagrams that document the structure and behavior of the IoT prototype and the simulator application. The diagrams can be opened with the freely testable software StarUML, see https://staruml.io. 
 
 The diagrams are organized in Requirement-, Analysis-, and Design diagrams which become increasingly more detailed.
+
+#####################################################
+
+End-to-end tests for the different use cases and the evaluation chapter are contained in
+frontend/src/test

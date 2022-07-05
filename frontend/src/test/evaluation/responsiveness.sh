@@ -1,5 +1,6 @@
 #!/bin/bash
-#call as ./performance.sh numberOfDevices not as sh performance.sh https://stackoverflow.com/questions/2462317/bash-syntax-error-redirection-unexpected
+# This script runs tests for the responsiveness of the IoT applications
+# call as ./responsiveness.sh numberOfDevices not as sh responsiveness.sh https://stackoverflow.com/questions/2462317/bash-syntax-error-redirection-unexpected
 
 kubectl config set-context --current --namespace=iot-system-1
 http_port_frontend=$(kubectl get service | grep "frontend-service" | grep "8080" | grep  -o '8080:[^/TCP]\+' | grep -o '3[[:digit:]]\{4\}')
@@ -11,7 +12,6 @@ timeAllowedPerRequest=2.0
 timeAllowedForUpdateToSingleDeviceRegisteredAtServer=2.0
 
 echo "<<< Starting $numberOfDevices devices >>>"
-
 
 notAllFound=1
 while (( $(echo "$notAllFound") ))
